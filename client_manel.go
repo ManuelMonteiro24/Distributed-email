@@ -25,7 +25,7 @@ func menu(){
 
   switch input {
         case 1: save_info := Dest_information()
-                fmt.Println(save_info) 
+                fmt.Println(save_info)
         case 2:
                 fmt.Println("Chamar funcao check inbox")
         case 3:
