@@ -1,21 +1,24 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+)
 
 /*Gera um ficheiro .json com os parametros da estrutura Mail definida em struts.
 Lê o ficheiro .json criado de volta para a estrutura Mail
  */
 func main() {
-	var nof string = "message.txt"
-	payload := readFile(nof)
-	var mail = &Mail {
-		To: "criptas",
-		Proof_of_Work: "hashhhh",
-		Payload: payload}
-	writeJSON(*mail)
-	mail2 := readJSON()
-	fmt.Print(mail2.To + " " + mail2.Proof_of_Work + " " + mail2.Payload)//só para debug
+	//var nof string = "message.txt"
+	//payload := readFile(nof)
+	var mail Mail
+
+	(&mail).AddField(1,"1")
+	(&mail).AddField(0,"0")
+	WriteJSON(mail)
+	mail2 := ReadJSON()
+	fmt.Print(mail2.Header + " " + mail2.Proof_of_Work + " " + mail2.Payload)//só para debug
 }
+
 /*func main() {
 
 	/*dat, err := ioutil.ReadFile("codeGO.txt")
