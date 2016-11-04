@@ -24,7 +24,7 @@ func menu(){
   }
 
   switch input {
-        case 1: save_info := Dest_information()
+        case 1: save_info := DestInformation()
                 fmt.Println(save_info)
         case 2:
                 fmt.Println("Chamar funcao check inbox")
@@ -37,19 +37,16 @@ func menu(){
 
 }
 
-func Dest_information() (dest string){
+func DestInformation() (dest []string){
   fmt.Println("Email information")
   for {
-    fmt.Println("To: ")
-    var input string
-    n, err := fmt.Scanln(&input)
-    if n < 1 || n > 2 || err != nil {
-      fmt.Println("Invalid input")
-    } else {
-      return input
-      fmt.Println(input)
-      }
-    }
+        fmt.Println("To: ")
+        n, err := fmt.Scanln(&dest)
+        if n < 1 || n > 2 || err != nil {
+                fmt.Println("Invalid input")
+        } else{
+                for strings.Index(dest, ",") != -1
+                return dest
+        }
   }
-//Meter aqui funcao do amado que recebe o texto que o utilizador quer enviar
-//e introduz num ficheiro para enviar???
+}
