@@ -11,12 +11,14 @@ func main() {
 	//var nof string = "message.txt"
 	//payload := readFile(nof)
 	var mail Mail
-
+	BuildHeader("shit")
+	fmt.Print(RandString(2))
 	(&mail).AddField(1,"1")
 	(&mail).AddField(0,"0")
 	WriteJSON(mail)
 	mail2 := ReadJSON()
-	fmt.Print(mail2.Header + " " + mail2.Proof_of_Work + " " + mail2.Payload)//só para debug
+	fmt.Printf("    ")
+	fmt.Print("mail_ready.json: " + mail2.Header + " " + mail2.Proof_of_Work + " " + mail2.Payload)//só para debug
 }
 
 /*func main() {

@@ -17,7 +17,7 @@ type Mail struct{
 specified by index = {0:Header, 1:Payload, 2:SymmKey, 3:Proof_of_Work}
  */
 func ( m *Mail) AddField(index int, content string) {
-	structValue := reflect.ValueOf(m).Elem()//reflect.ValueOf(m)returns new Value inited to the concrete value stored in the interface &m
-	fieldValue := structValue.Field(index)// Field(index) returns Value of field with index "index"
-	fieldValue.SetString(content)//set field actual value
+	mValue := reflect.ValueOf(m).Elem()//reflect.ValueOf(m)returns new Value inited to the concrete value stored in the interface &m
+	fieldValue := mValue.Field(index)// Field(index) returns Value of field with index "index"
+	fieldValue.SetString(content)//set actual field value
 }
