@@ -3,7 +3,7 @@ package main
 import "reflect"
 
 type Mail struct{
-	Header string `json:"header"` //SHAversion??:bits:date:to:randString:counter
+	Header string `json:"header"` //
 	Payload string `json:"payload"` //encrypted with symmetric key
 	SymmKey string `json:"symmkey"`//symmetric key encrypted with "to" public key
 	Proof_of_Work string `json:"proof_of_work"` //SHA1 hash value of 'header'
