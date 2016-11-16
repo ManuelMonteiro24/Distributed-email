@@ -1,6 +1,8 @@
 package main
 
-import "reflect"
+import (
+	"reflect"
+)
 
 type Mail struct{
 	Header string `json:"header"` //
@@ -8,9 +10,16 @@ type Mail struct{
 	SymmKey string `json:"symmkey"`//symmetric key encrypted with "to" public key
 	Proof_of_Work string `json:"proof_of_work"` //SHA1 hash value of 'header'
 	/*
-	 *randString could be initialization vector (IV) if Cipher Block Chaining is used to encrypt
-	 *Timestamp - string proof of work dentro de um certo intervalo de tempo
+	 *Timestamp
 	 */
+}
+
+type Header struct{
+	ZeroCount int //num of most significant zero bits required for hash digest
+	Date string //Date
+	Resource string //"To" field from Mail
+	RandString string //randomly generated string
+	Counter int //counter
 }
 
 /*Gives a value to the field of Mail
@@ -21,3 +30,4 @@ func ( m *Mail) AddField(index int, content string) {
 	fieldValue := mValue.Field(index)// Field(index) returns Value of field with index "index"
 	fieldValue.SetString(content)//set actual field value
 }
+
