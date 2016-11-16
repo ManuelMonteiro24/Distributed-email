@@ -1,7 +1,5 @@
 package main
 
-<<<<<<< HEAD
-=======
 import (
 	"time"
 	"math/rand"
@@ -12,7 +10,7 @@ import (
 
 const letterArray = "absdefghijklmnopqrstuvyxwzABCDEFGHIJKLMNOPQRSTUVYXWZ"
 
->>>>>>> origin/funcAmado
+
 /*Verificar se existe algum erro*/
 func Check(e error) {
 	if e != nil {
@@ -20,14 +18,13 @@ func Check(e error) {
 	}
 }
 
-<<<<<<< HEAD
 /*Função para construir a string do field Header
 da estrutura Mail. Layout em strut.go
  */
 func buildHeader(to string) (header string) {
 	return header
-=======
 
+}
 /*Função para construir a string do field Header
 da estrutura Mail. Layout em strut.go
  */
@@ -78,5 +75,4 @@ func Encode64(source []byte) string {
 func Decode64(source string) (b []byte) {
 	b, _ = base64.StdEncoding.DecodeString(source)
 	return b
->>>>>>> origin/funcAmado
 }

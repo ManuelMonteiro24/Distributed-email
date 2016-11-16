@@ -17,7 +17,11 @@ func main() {
 
 	//this key needs to be saved and encrypted with dest public key
   _, err := rand.Read(key)
-  Check(err)
+  if err != nil {
+		panic(err)
+	}
+
+
 
 	// encrypt value to base64
 	cryptoText := encrypt(key, originalText)
@@ -35,7 +39,9 @@ func encrypt(key []byte, text string) string {
 	plaintext := []byte(text)
 
 	block, err := aes.NewCipher(key)
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// The IV needs to be unique, but not secure. Therefore it's common to
 	// include it at the beginning of the ciphertext.
@@ -49,15 +55,17 @@ func encrypt(key []byte, text string) string {
 	stream.XORKeyStream(ciphertext[aes.BlockSize:], plaintext)
 
 	// convert to base64
-	return Encode64(ciphertext)
+	return base64.URLEncoding.EncodeToString(ciphertext)
 }
 
 // decrypt from base64 to decrypted string
 func decrypt(key []byte, cryptoText string) string {
-	ciphertext, _ := Decode64(cryptoText)
+	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
 
 	block, err := aes.NewCipher(key)
-	Check(err)
+	if err != nil {
+		panic(err)
+	}
 
 	// The IV needs to be unique, but not secure. Therefore it's common to
 	// include it at the beginning of the ciphertext.
