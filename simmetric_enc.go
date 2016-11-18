@@ -7,34 +7,40 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"utils"
 )
 
 func main() {
 	originalText := "encrypt this"
 	fmt.Println(originalText)
 
-	key := make([]byte, 16)
-
-	//this key needs to be saved and encrypted with dest public key
-  _, err := rand.Read(key)
-  if err != nil {
-		panic(err)
-	}
-
-
+	key := gen_sym_key()
+	fmt.Println(key)
 
 	// encrypt value to base64
-	cryptoText := encrypt(key, originalText)
+	cryptoText := sym_encrypt(key, originalText)
 	fmt.Println(cryptoText)
 
 	// encrypt base64 crypto to original value
-	text := decrypt(key, cryptoText)
+	text := sym_decrypt(key, cryptoText)
 	fmt.Printf(text)
 }
+// genreate sym key
+func gen_sym_key() []byte{
 
+	//Define the key size, always the same
+	key := make([]byte, 16)
+
+	//this key needs to be saved and encrypted with dest public key
+	_, err := rand.Read(key)
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
 
 // encrypt string to base64 crypto using AES
-func encrypt(key []byte, text string) string {
+func sym_encrypt(key []byte, text string) string {
 	// key := []byte(keyText)
 	plaintext := []byte(text)
 
@@ -59,7 +65,7 @@ func encrypt(key []byte, text string) string {
 }
 
 // decrypt from base64 to decrypted string
-func decrypt(key []byte, cryptoText string) string {
+func sym_decrypt(key []byte, cryptoText string) string {
 	ciphertext, _ := base64.URLEncoding.DecodeString(cryptoText)
 
 	block, err := aes.NewCipher(key)

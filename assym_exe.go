@@ -87,6 +87,4 @@ func main() {
 	} else {
 		fmt.Println("Verify Signature successful")
 	}
-
 }
-Contact GitHub API Training Shop Blog About

@@ -3,7 +3,7 @@ package main
 import "fmt"
 import "os"
 
-
+/*
 func main() {
     fmt.Printf("Hello welcome to the Distributed email\n")
 
@@ -14,7 +14,7 @@ func main() {
             menu()
         }
 }
-//Menu inicial ?? adaptar ao metodo de autenticação do utilizador
+//Menu inicial ?? adaptar ao metodo de autenticação do utilizador*/
 func menu(){
   var input int
   n, err := fmt.Scanln(&input)
