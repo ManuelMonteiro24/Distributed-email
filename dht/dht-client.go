@@ -7,10 +7,11 @@ import (
     "os/signal"
     "strconv"
     "strings"
-//    "bytes"
+    "bytes"
     "crypto/sha1"
-
-    "github.com/prettymuchbryce/kademlia"
+    "golang.org/x/crypto/openpgp"
+//    "golang.org/x/crypto/openpgp/packet"
+    "github.com/colobas/kademlia"
 
     "gopkg.in/readline.v1"
 )
@@ -62,8 +63,8 @@ func main() {
         IP:             *ip,
         Port:           *port,
         UseStun:        *stun,
+        entity:         node_entity,
     }
-
 
     h := sha1.New()
     node_entity.Serialize(h)
