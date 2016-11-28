@@ -7,11 +7,7 @@ import (
     "os/signal"
     "strconv"
     "strings"
-    "bytes"
-    "crypto/sha1"
-    "golang.org/x/crypto/openpgp"
-//    "golang.org/x/crypto/openpgp/packet"
-    "github.com/colobas/kademlia"
+    "distmail/kademlia"
 
     "gopkg.in/readline.v1"
 )
@@ -63,12 +59,8 @@ func main() {
         IP:             *ip,
         Port:           *port,
         UseStun:        *stun,
-        entity:         node_entity,
+        ID:             node_entity.PrimaryKey.Fingerprint[:],
     }
-
-    h := sha1.New()
-    node_entity.Serialize(h)
-    options.ID = h.Sum(nil)
 
     dht, err := kademlia.NewDHT(&kademlia.MemoryStore{}, &options)
 
@@ -181,4 +173,33 @@ store <message> - Store a message on the network
 get <key> - Get a message from the network
 info - Display information about this node
     `)
+}
+
+func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
+    var buc, l, e int
+    var extracted [160]int
+    n := ht.totalNodes()
+
+    if n > 3 {
+        n = 3
+    }
+
+    for len(onion_nodes) < n {
+        buc = rand.Intn(160)
+        l = len(RoutingTable[buc])
+        e = extracted[buc]
+        if l > e {
+            onion_nodes = append(onion_nodes, RoutingTable[buc][l-1-e])
+            extracted[buc] += 1
+        }
+    }
+
+    return onion_nodes
+}
+
+func buildOnion(final_node *NetworkNode, onion_nodes []*NetworkNode, data []byte) {
+    if len(onion_nodes) > 0 {
+    } else {
+        return onion_nodes
+    }
 }
