@@ -9,9 +9,6 @@ type Mail struct{
 	Payload string `json:"payload"` //encrypted with symmetric key
 	SymmKey string `json:"symmkey"`//symmetric key encrypted with "to" public key
 	Proof_of_Work string `json:"proof_of_work"` //SHA1 hash value of 'header'
-	/*
-	 *Timestamp
-	 */
 }
 
 type Header struct{
