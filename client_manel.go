@@ -13,15 +13,16 @@ import (
 
 func main() {
     fmt.Printf("Hello welcome to the Distributed email\n")
-     user_name := auth_user()
-    fmt.Println("User: ", user_name)
+     user_name, userKey:= auth_user()
+    fmt.Println("User_name: ", user_name)
+    fmt.Println("User_key: ", userKey)
         for {
           fmt.Printf("Main Menu\n 1.New email 2.Check your inbox 3. Exit\n")
-            menu(user_name)
+            menu(user_name, userKey)
         }
 }
 
-func auth_user()(string){
+func auth_user()(string, interface{}){
   var user_name = data_input("Insert Username: ")
   // detect if key file associated to user exists
 	 _, err := os.Stat(user_name + "_PrivateKey")
@@ -35,8 +36,6 @@ func auth_user()(string){
     // generate user key
     userKey, err := rsa.GenerateKey(rand.Reader, 2048)
     checkError(err)
-
-    fmt.Println("User Key : ", userKey)
 
     //encode key to file
     pemdata := pem.EncodeToMemory(
@@ -65,7 +64,7 @@ func auth_user()(string){
     ioutil.WriteFile(contact_name, pemdata, 0644)
 
 		fmt.Printf("User keys generated!\n")
-
+    return user_name, userKey
   }else{
     //load user key from file
     fmt.Printf("User login successful!\n")
@@ -75,12 +74,12 @@ func auth_user()(string){
     userKey, err := x509.ParsePKCS1PrivateKey(pemdata.Bytes)
     checkError(err)
 
-    fmt.Println("User Key : ", userKey)
+    return user_name, userKey
   }
-  return user_name
 }
 
-func menu(user_name string){
+func menu(user_name string, userKey interface{}){
+
   var input int
   n, err := fmt.Scanln(&input)
   if n < 1 || n > 2 || err != nil {
@@ -90,7 +89,8 @@ func menu(user_name string){
   switch input {
         case 1:
                 fmt.Println("New email option chosen\n")
-                dest_name := rcv_dest()
+                dest_name, dest_PublicKey := rcv_dest()
+                fmt.Println("Dest PublicKey : ", dest_PublicKey)
                 file_name := file_to_send()
                 fmt.Println("Sender:", user_name, "\nDest :", dest_name, "\nFile: ", file_name,"\n")
 
@@ -104,7 +104,7 @@ func menu(user_name string){
   }
 }
 
-func rcv_dest()(string){
+func rcv_dest()(string, interface{}){
     //recieve name of contact
     var recp_name = data_input("Insert Recipient: ")
 
@@ -113,10 +113,14 @@ func rcv_dest()(string){
   	if os.IsNotExist(err) {
       fmt.Println(err.Error())
   		os.Exit(3)
-    } else{
-      fmt.Println("Contact found!\n")
     }
-    return recp_name
+      fmt.Println("Contact found!\n")
+      file_data, err := ioutil.ReadFile(recp_name + "_PublicKey")
+      checkError(err)
+      pemdata, _ := pem.Decode(file_data)
+      dest_PublicKey, err := x509.ParsePKIXPublicKey(pemdata.Bytes)
+      checkError(err)
+      return recp_name, dest_PublicKey
 }
 
 func file_to_send()(string){
