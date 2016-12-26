@@ -43,7 +43,9 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 	h.ZeroCount = 20
 	h.Date = CreateDate(t)
 	h.From = from
-	h.Resource = to
+	rsrc, err := x509.MarshalPKIXPublicKey(toPublicKey)
+	checkError(err)
+	h.Resource = Encode64(rsrc)//Para ler de volta, usar -- bytes, err, := x509.ParsePKIXPublicKey(Decode64(h.Resource))
 	h.RandString = RndStr(12) //random 12 byte string
 	h.Counter = RndInt(COUNTER_INTERVAL)
 
@@ -59,8 +61,8 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 	mail.Header = header
 	mail.Proof_of_Work = Encode64(pow)
 
-	/*Generate payload string with format "PoW//TO//FROM//MESSAGE//SIGNATURE" */
-	payloadArray := []string{mail.Proof_of_Work,h.Resource, h.From, message}
+	/*Generate payload string with format "PoW//\\TO//\\FROM//\\MESSAGE//\\SIGNATURE" */
+	payloadArray := []string{mail.Proof_of_Work, to, h.From, message}
 	payload := strings.Join(payloadArray, "//\\\\")
 
 	/*Sign payload*/
@@ -75,63 +77,26 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 	checkError(err)
 	mail.SymKey = Encode64(encSymKey)
 
-	fmt.Println("DECRYPTED PAYLOAD!!")
-	fmt.Println(SymDecrypt(symKey, mail.Payload), "\n    HD    ", Encode64(HashDigest(mail.Header)) )
 	return mail
 }
 
-/*Signs digest with priv private key
-Returns signature in string format, encoded in Base64
- */
-func Sign(digest []byte, priv *rsa.PrivateKey) string{
-	var opts rsa.PSSOptions
-	opts.SaltLength = rsa.PSSSaltLengthAuto //for simplicity
-	signature, err := rsa.SignPSS(rand.Reader, priv, crypto.SHA1, digest, &opts)
-	checkError(err)
-	return Encode64(signature)
-}
-
-func CheckSign(digest []byte, signature []byte, senderKey *rsa.PublicKey) bool{
-	var opts rsa.PSSOptions
-	opts.SaltLength = rsa.PSSSaltLengthAuto
-	if rsa.VerifyPSS(senderKey, crypto.SHA1, digest, signature, &opts) == nil {
-		return true
-	}else {
-		return false
-	}
-}
-
-/*Create a date string with current date of the form DDMMYYHHmm */
-func CreateDate(t time.Time) (date string) {
-
-	var DD , MM string
-
-	if t.Day() < 10 {
-		DD = "0" + strconv.Itoa(t.Day())
-	}else {
-		DD = strconv.Itoa(t.Day())
-	}
-
-	if int(t.Month()) < 10 {
-		MM = "0" + strconv.Itoa(int(t.Month()))
-	}else {
-		MM = strconv.Itoa(int(t.Month()))
-	}
-
-	hh, mm, _ := t.Clock()
-
-	date = DD + MM + strconv.Itoa(t.Year()-2000) + strconv.Itoa(hh) + strconv.Itoa(mm)
-	return date
-}
-
+/*Reads Mail using user PrivateKey and sender PublicKey*/
 func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
 
+	/*Integrity check*/
 	if mail.Proof_of_Work != Encode64(HashDigest(mail.Header)){
 		fmt.Print("Mail may be spam or was illicitly altered!! (pow test fail)\n")
 		return
 	}
 	var header Header
 	header.StringToHeader(mail.Header)
+
+	/*Check if user PublicKey is equal to header.Resource(TO) */
+	pub, err := x509.MarshalPKIXPublicKey(&userKey.PublicKey)
+	checkError(err)
+	if header.Resource == Encode64(pub) {
+		fmt.Print("Header.Resource == userKey.PublicKey\n")
+	}
 
 	/*Retrieve symKey*/
 	symKey, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, userKey, Decode64(mail.SymKey), []byte(""))
@@ -148,10 +113,61 @@ func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
 		return
 	}
 
-	fmt.Print("\nMESSAGE\n", plParts[3])
+	fmt.Print("\nMESSAGE\nFROM: ", plParts[2], "\nTO: ", plParts[1], "\nCONTENT: ", plParts[3], "\n")
 
 }
 
+/*Signs digest with priv private key
+Returns signature in string format, encoded in Base64
+ */
+func Sign(digest []byte, priv *rsa.PrivateKey) string{
+	var opts rsa.PSSOptions
+	opts.SaltLength = rsa.PSSSaltLengthAuto //for simplicity
+	signature, err := rsa.SignPSS(rand.Reader, priv, crypto.SHA1, digest, &opts)
+	checkError(err)
+	return Encode64(signature)
+}
+
+/*Check signature with senderKey and digest
+ *Returns true if signature is valid and false otherwise
+ */
+func CheckSign(digest []byte, signature []byte, senderKey *rsa.PublicKey) bool{
+	var opts rsa.PSSOptions
+	opts.SaltLength = rsa.PSSSaltLengthAuto
+	if rsa.VerifyPSS(senderKey, crypto.SHA1, digest, signature, &opts) == nil {
+		return true
+	}else {
+		return false
+	}
+}
+
+/*Create a date string with current date of the form DDMMYYHHmm */
+func CreateDate(t time.Time) (date string) {
+
+	DD := t.Day()
+	MM := int(t.Month())
+
+	day := strconv.Itoa(DD)
+	month := strconv.Itoa(MM)
+	if DD < 10 {
+		day = "0" + day
+	}
+	if MM < 10 {
+		month = "0" + month
+	}
+
+	hh, mm, _ := t.Clock()
+	hours := strconv.Itoa(hh)
+	minutes := strconv.Itoa(mm)
+	if hh < 10 {
+		hours = "0" + hours
+	}
+	if mm < 10 {
+		minutes = "0" + minutes
+	}
+	date = day + month + strconv.Itoa(t.Year()-2000) + hours + minutes
+	return date
+}
 
 func AuthUser() (string, *rsa.PrivateKey) {
         var user_name = DataInput("Insert Username: ")
@@ -269,7 +285,7 @@ func RcvDest() (string, *rsa.PublicKey){
 	return recp_name, pub.(*rsa.PublicKey)
 }
 
-func FileToSend()(string){
+func FileToSend() (string){
 	//recieve name of file
 	var file_name = DataInput("Insert name of file to send: ")
 

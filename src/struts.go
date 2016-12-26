@@ -7,7 +7,7 @@ import (
 type Mail struct{
 	Header string `json:"header"` //
 	Proof_of_Work string `json:"proof_of_work"` //SHA1 hash value of 'header'
-	Payload string `json:"payload"` //encrypted with symmetric key
+	Payload string `json:"payload"` //encrypted with symmetric key; format = {PoW//\\FROM//\\TO//\\MESSAGE//\\SIGNATURE}
 	SymKey string `json:"symmkey"`//symmetric key encrypted with "to" public key; SymKey in base64
 }
 
