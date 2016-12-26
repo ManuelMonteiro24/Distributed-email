@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"time"
 	"strconv"
+	"path/filepath"
 )
 
 const COUNTER_INTERVAL = 1000000
@@ -20,8 +21,8 @@ const COUNTER_INTERVAL = 1000000
 func main() {
     fmt.Printf("\nHello welcome to the Distributed email\n")
     user_name, userKey:= AuthUser()
-    fmt.Println("User_name: ", user_name)
-    fmt.Println("User_key: ", userKey)
+    //fmt.Println("User_name: ", user_name)
+    //fmt.Println("User_key: ", userKey)
 
     for {
         fmt.Printf("Main Menu\n 1.New email 2.Check your inbox 3. Exit\n")
@@ -101,7 +102,6 @@ func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
 	/*Retrieve symKey*/
 	symKey, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, userKey, Decode64(mail.SymKey), []byte(""))
 	checkError(err)
-
 	/*Retrieve payload*/
 	payload := SymDecrypt(symKey, mail.Payload)
 	plParts := strings.Split(payload, "//\\\\")
@@ -170,64 +170,86 @@ func CreateDate(t time.Time) (date string) {
 }
 
 func AuthUser() (string, *rsa.PrivateKey) {
-        var user_name = DataInput("Insert Username: ")
 
-        var userPriv = user_name + "_PrivateKey"
-	 _, err := os.Stat(userPriv)
+	//check if Users dir exists if not creates one
+	rootpath, _ := os.Getwd()
+	subpath := filepath.Join(rootpath, "Users")
+	err := os.MkdirAll(subpath, os.ModePerm)
+	checkError(err)
 
-        // detect if key file associated to user exists
-        if os.IsNotExist(err) {
-	//create user key file
+	//check if Users list file, with the passwords exists if not creates one
+	users_list := filepath.Join(subpath,"users_list.txt")
+	_, err = os.Stat(users_list)
+
+	if os.IsNotExist(err){
+		var users_list, err = os.Create(users_list)
+		checkError(err)
+		defer users_list.Close()
+	}
+
+	user_name := DataInput("Insert Username: ")
+	userPriv := filepath.Join(subpath, user_name + "_PrivateKey")
+	_, err = os.Stat(userPriv)
+
+	// detect if key file associated to user exists
+	if os.IsNotExist(err) {
+
+		//create user key file
 		var user_file, err = os.Create(userPriv)
 		checkError(err)
 		defer user_file.Close()
 
-                // generate user key
-                userKey, err := rsa.GenerateKey(rand.Reader, 2048)
-                checkError(err)
-
-                //encode key to file
-                pemdata := pem.EncodeToMemory(
-                &pem.Block{
-                        Type: "RSA PRIVATE KEY",
-                        Bytes: x509.MarshalPKCS1PrivateKey(userKey),
-                },
-                )
-                ioutil.WriteFile(userPriv, pemdata, 0644)
-
-                //create user PublicKey contact file
-                PublicKey, err := x509.MarshalPKIXPublicKey(&userKey.PublicKey)
-                checkError(err)
-
-                pemdata = pem.EncodeToMemory(
-                &pem.Block{
-                        Type: "RSA PUBLIC KEY",
-                        Bytes: PublicKey,
-                },
-                )
-
-                var contact_name string = user_name + "_PublicKey"
-                contact_file, err := os.Create(contact_name)
+		// generate user key
+		userKey, err := rsa.GenerateKey(rand.Reader, 2048)
 		checkError(err)
-                defer contact_file.Close()
 
-                ioutil.WriteFile(contact_name, pemdata, 0644)
+		//encode key to file
+		pemdata := pem.EncodeToMemory(
+			&pem.Block{
+				Type: "RSA PRIVATE KEY",
+				Bytes: x509.MarshalPKCS1PrivateKey(userKey),
+			},
+		)
+
+		ioutil.WriteFile(userPriv, pemdata, 0644)
+
+		//create user PublicKey contact file
+		PublicKey, err := x509.MarshalPKIXPublicKey(&userKey.PublicKey)
+		checkError(err)
+
+		pemdata = pem.EncodeToMemory(
+			&pem.Block{
+				Type: "RSA PUBLIC KEY",
+				Bytes: PublicKey,
+			},
+		)
+
+		userPub := filepath.Join(subpath, user_name + "_PublicKey")
+		contact_file, err := os.Create(userPub)
+		checkError(err)
+		defer contact_file.Close()
+
+		ioutil.WriteFile(userPub, pemdata, 0644)
 
 		fmt.Printf("User keys generated!\n")
-                return user_name, userKey
-        }else{
-        //load user key from file
-                fmt.Printf("User login successful!\n")
-                file_data, err := ioutil.ReadFile(userPriv)
-                checkError(err)
-                pemdata, _ := pem.Decode(file_data)
-                userKey, err := x509.ParsePKCS1PrivateKey(pemdata.Bytes)
-                checkError(err)
+		return user_name, userKey
 
-                return user_name, userKey
-        }
+	}else{
+		//load user key from file
+		fmt.Printf("User login successful!\n")
+		file_data, err := ioutil.ReadFile(userPriv)
+		checkError(err)
+		pemdata, _ := pem.Decode(file_data)
+		userKey, err := x509.ParsePKCS1PrivateKey(pemdata.Bytes)
+		checkError(err)
 
+		return user_name, userKey
+	}
 }
+/*
+func Pass_gen_or_check(user_name string){
+	rcv_pass := DataInput("Insert Password: ")
+}*/
 
 func Menu(user_name string, userKey *rsa.PrivateKey){
 
@@ -239,9 +261,8 @@ func Menu(user_name string, userKey *rsa.PrivateKey){
 	}
 	switch input {
 	case 1:
-		fmt.Println("New email option chosen\n")
+		fmt.Println("New email option chosen:\n")
 		dest_name, dest_PublicKey := RcvDest()
-		fmt.Println("Dest PublicKey : ", dest_PublicKey)
 		file_name := FileToSend()
 		fmt.Println("Sender:", user_name, "\nDest :", dest_name, "\nFile: ", file_name,"\n")
 		message := ReadFile(file_name)
@@ -265,18 +286,26 @@ func Menu(user_name string, userKey *rsa.PrivateKey){
 }
 
 func RcvDest() (string, *rsa.PublicKey){
-    //receive name of contact
-    var recp_name = DataInput("Insert Recipient: ")
 
-    //Check if contact exists
-	_, err := os.Stat(recp_name + "_PublicKey")
+	//check if Contacts dir exists if not creates one
+	rootpath, _ := os.Getwd()
+	subpath := filepath.Join(rootpath, "Contacts")
+	os.MkdirAll(subpath, os.ModePerm)
+
+	//receive name of contact
+	var recp_name = DataInput("Insert Recipient: ")
+
+	//Check if contact exists
+	subpath = filepath.Join(subpath, recp_name + "_PublicKey")
+	_, err := os.Stat(subpath)
+
 	if os.IsNotExist(err) {
 		fmt.Printf("No such contact in Contacts list!\n")
 		os.Exit(3)
 	}
 
 	fmt.Println("Contact found!\n")
-	file_data, err := ioutil.ReadFile(recp_name + "_PublicKey")
+	file_data, err := ioutil.ReadFile(subpath)
 	checkError(err)
 	pemdata, _ := pem.Decode(file_data)
 	pub, err := x509.ParsePKIXPublicKey(pemdata.Bytes)
@@ -285,7 +314,7 @@ func RcvDest() (string, *rsa.PublicKey){
 	return recp_name, pub.(*rsa.PublicKey)
 }
 
-func FileToSend() (string){
+func FileToSend()(string){
 	//recieve name of file
 	var file_name = DataInput("Insert name of file to send: ")
 
@@ -301,29 +330,14 @@ func FileToSend() (string){
 }
 
 func DataInput(msg string) (string){
-  for{
-    var data string
-      fmt.Println(msg)
-    n, err := fmt.Scanln(&data)
-      if n < 1 || n > 2 || err != nil {
-        fmt.Println("Invalid input\n")
-      }else{
-        return data
-      }
-  }
-}
-
-func DestInformation() (dest string){
-  fmt.Println("Email information")
-  for {
-    fmt.Println("To: ")
-    var input string
-    n, err := fmt.Scanln(&input)
-    if n < 1 || n > 2 || err != nil {
-      fmt.Println("Invalid input")
-    } else {
-      return input
-      fmt.Println(input)
-      }
-    }
+	for{
+		var data string
+		fmt.Println(msg)
+		n, err := fmt.Scanln(&data)
+		if n < 1 || n > 2 || err != nil {
+			fmt.Println("Invalid input\n")
+		}else{
+			return data
+		}
+	}
 }
