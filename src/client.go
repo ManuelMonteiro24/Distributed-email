@@ -158,6 +158,7 @@ func AuthUser() (string, *rsa.PrivateKey) {
 	checkError(err)
 
 	//check if Users list file, with the passwords exists if not creates one
+	/*
 	users_list := filepath.Join(subpath,"users_list.txt")
 	_, err = os.Stat(users_list)
 
@@ -165,7 +166,7 @@ func AuthUser() (string, *rsa.PrivateKey) {
 		var users_list, err = os.Create(users_list)
 		checkError(err)
 		defer users_list.Close()
-	}
+	}*/
 
 	user_name := DataInput("Insert Username: ")
 	userPriv := filepath.Join(subpath, user_name + "_PrivateKey")
@@ -226,6 +227,7 @@ func AuthUser() (string, *rsa.PrivateKey) {
 		return user_name, userKey
   }
 }
+//funcao para ficheiro de passwords
 /*
 func Pass_gen_or_check(user_name string){
 
