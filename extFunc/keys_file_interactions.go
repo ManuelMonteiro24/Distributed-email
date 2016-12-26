@@ -35,10 +35,3 @@ func writeFile(key string, file_name string) {
 	err = file.Sync()
 	checkError(err)
 }
-
-func checkError(err error) {
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(0)
-	}
-}

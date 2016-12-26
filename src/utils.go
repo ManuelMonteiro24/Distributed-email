@@ -5,7 +5,7 @@ import (
 	"time"
 	"math/rand"
 	"fmt"
-	//"strings"
+	"os"
 	"encoding/base64"
 )
 
@@ -19,6 +19,13 @@ func Check(e error) {
 	}
 }
 
+func checkError(err error) {
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(0)
+	}
+}
+
 /*Função para construir a string do field Header
 da estrutura Mail. Layout em strut.go
  */
@@ -26,27 +33,7 @@ func buildHeader(to string) (header string) {
 	return header
 
 }
-/*Função para construir a string do field Header
-da estrutura Mail. Layout em strut.go
- */
-/*func BuildHeader(to string) string {
-	var zeroBits float64 = 20
-	var currentTime time.Time = time.Now()
-	var rndString string = RndString(6)//6 bytes para poder ser codificada em base64 sem precisar de padding
-	var headerArray = make([]string, 6)
 
-	y, m, d := currentTime.Date()//ano, mês, dia
-
-	headerArray[0] = "1" //SHA version
-	headerArray[1] = strconv.Itoa(int(zeroBits)) //número de pre-image 0 bits para calculo da hash
-	headerArray[2] =  strconv.Itoa(d)  + strconv.Itoa(int(m)) + strings.TrimPrefix(strconv.Itoa(y), "20")
-	headerArray[3] = to
-	headerArray[4] = Encode64([]byte(rndString))
-	headerArray[5] = Encode64([]byte(strconv.Itoa(RndInt(200))))
-
-	return strings.Join(headerArray, ":")
-}
-*/
 /*Retorna uma string gerada aleatoriamente de n bytes*/
 func RndStr(n int) string {
 	rndBytes := make([]byte, n)

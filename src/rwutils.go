@@ -31,8 +31,8 @@ func WriteJSON(mail Mail) {
 /*Faz o inverso da função acima.
 Pode ser útil para posterior implementação
  */
-func ReadJSON() (m Mail) {
-	var content string = ReadFile("mail_ready.json")
+func ReadJSON(nof string) (m Mail) {
+	var content string = ReadFile(nof)
 	json.Unmarshal([]byte(content), &m)
 	return m
 }
