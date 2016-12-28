@@ -76,6 +76,6 @@ func removeOnionLayer(onion Onion, ent *Entity) ([]byte, err){
 
     data_buf := new(bytes.Buffer)
     data_buf.ReadFrom(md.UnverifiedBody)
-    
+
     return data_buf.Bytes(), nil
 }
