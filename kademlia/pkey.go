@@ -6,7 +6,7 @@ import (
     "io/ioutil"
 )
 
-func getEntityFromFile(path string) (privkey *openpgp.Entity, err error) {
+func GetEntityFromFile(path string) (privkey *openpgp.Entity, err error) {
     b, err := ioutil.ReadFile(path) 
     if err != nil {
         return nil, err

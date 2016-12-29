@@ -1,6 +1,7 @@
 package kademlia
 
 import (
+    "golang.org/x/crypto/openpgp"
     "bytes"
     "errors"
     "log"
@@ -634,7 +635,7 @@ func (dht *DHT) listen() {
                 response.Type = messageTypePing
 
                 buf := new(bytes.Buffer)
-                entity.Serialize(buf)
+                dht.options.PublicEntity.Serialize(buf)
 
                 response.Data = buf.Bytes()
                 dht.networking.sendMessage(response, false, msg.ID)

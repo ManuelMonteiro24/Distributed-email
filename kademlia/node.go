@@ -3,7 +3,6 @@ package kademlia
 import (
 	"bytes"
 	"golang.org/x/crypto/openpgp"
-	"golang.org/x/crypto/openpgp/packet"
 	"math/big"
 	"net"
 	"strconv"

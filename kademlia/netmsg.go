@@ -12,6 +12,7 @@ const (
     messageTypeStore
     messageTypeFindNode
     messageTypeFindValue
+    messageTypeKeyExchange
 )
 
 type message struct {
