@@ -2,11 +2,11 @@ package kademlia
 
 import (
 	"bytes"
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/packet"
 	"math/big"
 	"net"
 	"strconv"
-    "golang.org/x/crypto/openpgp"
-    "golang.org/x/crypto/openpgp/packet"
 )
 
 // NetworkNode is the over-the-wire representation of a node
@@ -20,7 +20,8 @@ type NetworkNode struct {
 	// Port is the port of the node
 	Port int
 
-    PublicEntity *openpgp.Entity
+	// pgp public key of the node
+	PublicEntity *openpgp.Entity
 }
 
 // node represents a node in the network locally

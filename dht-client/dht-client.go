@@ -1,157 +1,157 @@
 package main
 
 import (
-    "flag"
-    "fmt"
-    "os"
-    "os/signal"
-    "strconv"
-    "strings"
-    "distmail/kademlia"
+	"distmail/kademlia"
+	"flag"
+	"fmt"
+	"os"
+	"os/signal"
+	"strconv"
+	"strings"
 
-    "gopkg.in/readline.v1"
+	"gopkg.in/readline.v1"
 )
 
 func main() {
-    var ip = flag.String("ip", "0.0.0.0", "IP Address to use")
-    var port = flag.String("port", "0", "Port to use")
-    var bIP = flag.String("bip", "", "IP Address to bootstrap against")
-    var bPort = flag.String("bport", "", "Port to bootstrap against")
-    var help = flag.Bool("help", false, "Display Help")
-    var stun = flag.Bool("stun", true, "Use STUN")
-    var pkeyfile = flag.String("pkeyfile", "", "File containing PGP private key")
+	var ip = flag.String("ip", "0.0.0.0", "IP Address to use")
+	var port = flag.String("port", "0", "Port to use")
+	var bIP = flag.String("bip", "", "IP Address to bootstrap against")
+	var bPort = flag.String("bport", "", "Port to bootstrap against")
+	var help = flag.Bool("help", false, "Display Help")
+	var stun = flag.Bool("stun", true, "Use STUN")
+	var pkeyfile = flag.String("pkeyfile", "", "File containing PGP private key")
 
-    flag.Parse()
+	flag.Parse()
 
-    if *help {
-        displayFlagHelp()
-        os.Exit(0)
-    }
+	if *help {
+		displayFlagHelp()
+		os.Exit(0)
+	}
 
-    if *ip == "" {
-        displayFlagHelp()
-        os.Exit(0)
-    }
+	if *ip == "" {
+		displayFlagHelp()
+		os.Exit(0)
+	}
 
-    if *port == "" {
-        displayFlagHelp()
-        os.Exit(0)
-    }
+	if *port == "" {
+		displayFlagHelp()
+		os.Exit(0)
+	}
 
-    if *pkeyfile == "" {
-        displayFlagHelp()
-        os.Exit(0)
-    }
+	if *pkeyfile == "" {
+		displayFlagHelp()
+		os.Exit(0)
+	}
 
-    node_entity, err := getEntityFromFile(*pkeyfile)
-    if err != nil {
-        panic(err)
-    }
+	node_entity, err := getEntityFromFile(*pkeyfile)
+	if err != nil {
+		panic(err)
+	}
 
-    var bootstrapNodes []*kademlia.NetworkNode
-    if *bIP != "" || *bPort != "" {
-        bootstrapNode := kademlia.NewNetworkNode(*bIP, *bPort)
-        bootstrapNodes = append(bootstrapNodes, bootstrapNode)
-    }
+	var bootstrapNodes []*kademlia.NetworkNode
+	if *bIP != "" || *bPort != "" {
+		bootstrapNode := kademlia.NewNetworkNode(*bIP, *bPort)
+		bootstrapNodes = append(bootstrapNodes, bootstrapNode)
+	}
 
-    options := kademlia.Options{
-        BootstrapNodes: bootstrapNodes,
-        IP:             *ip,
-        Port:           *port,
-        UseStun:        *stun,
-        ID:             node_entity.PrimaryKey.Fingerprint[:],
-    }
+	options := kademlia.Options{
+		BootstrapNodes: bootstrapNodes,
+		IP:             *ip,
+		Port:           *port,
+		UseStun:        *stun,
+		ID:             node_entity.PrimaryKey.Fingerprint[:],
+	}
 
-    dht, err := kademlia.NewDHT(&kademlia.MemoryStore{}, &options)
+	dht, err := kademlia.NewDHT(&kademlia.MemoryStore{}, &options)
 
-    fmt.Println("Opening socket..")
+	fmt.Println("Opening socket..")
 
-    if *stun {
-        fmt.Println("Discovering public address using STUN..")
-    }
+	if *stun {
+		fmt.Println("Discovering public address using STUN..")
+	}
 
-    err = dht.CreateSocket()
-    if err != nil {
-        panic(err)
-    }
-    fmt.Println("..done")
+	err = dht.CreateSocket()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("..done")
 
-    go func() {
-        fmt.Println("Now listening on " + dht.GetNetworkAddr())
-        err := dht.Listen()
-        panic(err)
-    }()
+	go func() {
+		fmt.Println("Now listening on " + dht.GetNetworkAddr())
+		err := dht.Listen()
+		panic(err)
+	}()
 
-    if len(bootstrapNodes) > 0 {
-        fmt.Println("Bootstrapping..")
-        dht.Bootstrap()
-        fmt.Println("..done")
-    }
+	if len(bootstrapNodes) > 0 {
+		fmt.Println("Bootstrapping..")
+		dht.Bootstrap()
+		fmt.Println("..done")
+	}
 
-    c := make(chan os.Signal, 1)
-    signal.Notify(c, os.Interrupt)
-    go func() {
-        for range c {
-            err := dht.Disconnect()
-            if err != nil {
-                panic(err)
-            }
-        }
-    }()
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+			err := dht.Disconnect()
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
 
-    rl, err := readline.New("> ")
-    if err != nil {
-        panic(err)
-    }
-    defer rl.Close()
+	rl, err := readline.New("> ")
+	if err != nil {
+		panic(err)
+	}
+	defer rl.Close()
 
-    for {
-        line, err := rl.Readline()
-        if err != nil { // io.EOF, readline.ErrInterrupt
-            break
-        }
-        input := strings.Split(line, " ")
-        switch input[0] {
-        case "help":
-            displayHelp()
-        case "store":
-            if len(input) != 2 {
-                displayHelp()
-                continue
-            }
-            id, err := dht.Store([]byte(input[1]))
-            if err != nil {
-                fmt.Println(err.Error())
-            }
-            fmt.Println("Stored ID: " + id)
-        case "get":
-            if len(input) != 2 {
-                displayHelp()
-                continue
-            }
-            data, exists, err := dht.Get(input[1])
-            if err != nil {
-                fmt.Println(err.Error())
-            }
-            fmt.Println("Searching for", input[1])
-            if exists {
-                fmt.Println("..Found data:", string(data))
-            } else {
-                fmt.Println("..Nothing found for this key!")
-            }
-        case "info":
-            nodes := dht.NumNodes()
-            self := dht.GetSelfID()
-            addr := dht.GetNetworkAddr()
-            fmt.Println("Addr: " + addr)
-            fmt.Println("ID: " + self)
-            fmt.Println("Known Nodes: " + strconv.Itoa(nodes))
-        }
-    }
+	for {
+		line, err := rl.Readline()
+		if err != nil { // io.EOF, readline.ErrInterrupt
+			break
+		}
+		input := strings.Split(line, " ")
+		switch input[0] {
+		case "help":
+			displayHelp()
+		case "store":
+			if len(input) != 2 {
+				displayHelp()
+				continue
+			}
+			id, err := dht.Store([]byte(input[1]))
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			fmt.Println("Stored ID: " + id)
+		case "get":
+			if len(input) != 2 {
+				displayHelp()
+				continue
+			}
+			data, exists, err := dht.Get(input[1])
+			if err != nil {
+				fmt.Println(err.Error())
+			}
+			fmt.Println("Searching for", input[1])
+			if exists {
+				fmt.Println("..Found data:", string(data))
+			} else {
+				fmt.Println("..Nothing found for this key!")
+			}
+		case "info":
+			nodes := dht.NumNodes()
+			self := dht.GetSelfID()
+			addr := dht.GetNetworkAddr()
+			fmt.Println("Addr: " + addr)
+			fmt.Println("ID: " + self)
+			fmt.Println("Known Nodes: " + strconv.Itoa(nodes))
+		}
+	}
 }
 
 func displayFlagHelp() {
-    fmt.Println(`cli-example
+	fmt.Println(`cli-example
 
 Usage:
     cli-example --port [port]
@@ -167,39 +167,10 @@ Options:
 }
 
 func displayHelp() {
-    fmt.Println(`
+	fmt.Println(`
 help - This message
 store <message> - Store a message on the network
 get <key> - Get a message from the network
 info - Display information about this node
     `)
-}
-
-func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
-    var buc, l, e int
-    var extracted [160]int
-    n := ht.totalNodes()
-
-    if n > 3 {
-        n = 3
-    }
-
-    for len(onion_nodes) < n {
-        buc = rand.Intn(160)
-        l = len(RoutingTable[buc])
-        e = extracted[buc]
-        if l > e {
-            onion_nodes = append(onion_nodes, RoutingTable[buc][l-1-e])
-            extracted[buc] += 1
-        }
-    }
-
-    return onion_nodes
-}
-
-func buildOnion(final_node *NetworkNode, onion_nodes []*NetworkNode, data []byte) {
-    if len(onion_nodes) > 0 {
-    } else {
-        return onion_nodes
-    }
 }
