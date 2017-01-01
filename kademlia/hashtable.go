@@ -3,6 +3,7 @@ package kademlia
 import (
 	"bytes"
 	"errors"
+	//"fmt"
 	"math"
 	"math/big"
 	"math/rand"
@@ -34,8 +35,8 @@ const (
 // hashTable represents the hashtable state
 type hashTable struct {
 	// The ID of the local node
-	Self *NetworkNode
-
+	Self             *NetworkNode
+	SelfPublicEntity []byte
 	// Routing table a list of all known nodes in the network
 	// Nodes within buckets are sorted by least recently seen e.g.
 	// [ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ][ ]
@@ -59,15 +60,17 @@ func newHashTable(options *Options) (*hashTable, error) {
 	if options.ID != nil {
 		ht.Self.ID = options.ID
 	} else {
-        return nil, errors.New("node can't have nil ID")
+		return nil, errors.New("node can't have nil ID")
 	}
 
-    if options.PublicEntity != nil {
-        ht.Self.PublicEntity = options.PublicEntity
-    } else {
-        return nil, errors.New("openpgp entity can't be nil")
-    }
+	if options.PublicEntity != nil {
+		buf := new(bytes.Buffer)
+		options.PublicEntity.Serialize(buf)
+		ht.SelfPublicEntity = buf.Bytes()
 
+	} else {
+		return nil, errors.New("openpgp entity can't be nil")
+	}
 
 	if options.IP == "" || options.Port == "" {
 		return nil, errors.New("Port and IP required")
@@ -281,7 +284,6 @@ func (ht *hashTable) getRandomIDFromBucket(bucket int) []byte {
 
 	return id
 }
-
 
 func getBucketIndexFromDifferingBit(id1 []byte, id2 []byte) int {
 	// Look at each byte from left to right

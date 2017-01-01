@@ -3,6 +3,7 @@ package kademlia
 import (
 	"bytes"
 	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/packet"
 	"math/big"
 	"net"
 	"strconv"
@@ -18,9 +19,6 @@ type NetworkNode struct {
 
 	// Port is the port of the node
 	Port int
-
-	// pgp public key of the node
-	PublicEntity *openpgp.Entity
 }
 
 // node represents a node in the network locally
@@ -28,6 +26,9 @@ type NetworkNode struct {
 // here later such as RTT, or LastSeen time
 type node struct {
 	*NetworkNode
+
+	// serialized pgp public key of the node
+	PublicEntity []byte
 }
 
 // NewNetworkNode creates a new NetworkNode for bootstrapping
@@ -137,4 +138,11 @@ func getDistance(id1 []byte, id2 []byte) *big.Int {
 	buf2 := new(big.Int).SetBytes(id2)
 	result := new(big.Int).Xor(buf1, buf2)
 	return result
+}
+
+func (node *node) DeserializeEntity() (*openpgp.Entity, error) {
+	r := bytes.NewReader(node.PublicEntity)
+	packets := packet.NewReader(r)
+	ent, err := openpgp.ReadEntity(packets)
+	return ent, err
 }
