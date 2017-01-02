@@ -43,7 +43,6 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 	/*Fill header with mail specific info*/
 	h.ZeroCount = 20
 	h.Date = CreateDate(t)
-	h.From = from
 	rsrc, err := x509.MarshalPKIXPublicKey(toPublicKey)
 	checkError(err)
 	h.Resource = Encode64(rsrc)//Para ler de volta, usar -- bytes, err, := x509.ParsePKIXPublicKey(Decode64(h.Resource))
@@ -63,14 +62,15 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 	mail.Proof_of_Work = Encode64(pow)
 
 	/*Generate payload string with format "PoW//\\TO//\\FROM//\\MESSAGE//\\SIGNATURE" */
-	payloadArray := []string{mail.Proof_of_Work, to, h.From, message}
+	payloadArray := []string{mail.Proof_of_Work, to, from, message}
 	payload := strings.Join(payloadArray, "//\\\\")
 
 	/*Sign payload*/
 	payloadSignature := Sign(HashDigest(payload), userKey)
 
-	/*Encrypt (payload + signature) with symKey*/
+	/*Encrypt (payload + signature) and from field with symKey*/
 	symKey := GenSymKey()
+	mail.From = SymEncrypt(symKey, from)
 	mail.Payload = SymEncrypt(symKey, payload + "//\\\\" + payloadSignature) //Payload encrypted with symKey, encoded in Base64
 
 	/*Encrypt symKey with recipient toPublicKey*/
@@ -98,12 +98,13 @@ func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
 	if header.Resource == Encode64(pub) {
 		fmt.Print("Header.Resource == userKey.PublicKey\n")
 	}
-
+	
 	/*Retrieve symKey*/
 	symKey, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, userKey, Decode64(mail.SymKey), []byte(""))
 	checkError(err)
 	/*Retrieve payload*/
 	payload := SymDecrypt(symKey, mail.Payload)
+	from := SymDecrypt(symKey, mail.From)
 	plParts := strings.Split(payload, "//\\\\")
 
 	/*Check for valid sender signature*/
@@ -113,7 +114,7 @@ func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
 		return
 	}
 
-	fmt.Print("\nMESSAGE\nFROM: ", plParts[2], "\nTO: ", plParts[1], "\nCONTENT: ", plParts[3], "\n")
+	fmt.Print("\nMESSAGE\nFROM: ", from, "\nTO: ", plParts[1], "\nCONTENT: ", plParts[3], "\n")
 
 }
 

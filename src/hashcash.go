@@ -54,15 +54,14 @@ func CheckZeroBits(b []byte, zeroBits int) bool {
  *Header layout in struts.go
  */
 func (h Header) HeaderToString() (string) {
-	hElem := make([]string, 7)
+	hElem := make([]string, 6)
 
 	hElem[0] = "1" //SHA version
 	hElem[1] = strconv.Itoa(h.ZeroCount)
 	hElem[2] = h.Date
-	hElem[3] = h.From
-	hElem[4] = h.Resource
-	hElem[5] = h.RandString
-	hElem[6] = Encode64([]byte(strconv.Itoa(h.Counter)))
+	hElem[3] = h.Resource
+	hElem[4] = h.RandString
+	hElem[5] = Encode64([]byte(strconv.Itoa(h.Counter)))
 
 	return strings.Join(hElem, ":")
 }
@@ -73,8 +72,7 @@ func (h *Header) StringToHeader(header string) {
 
 	h.ZeroCount, _ = strconv.Atoi(hElem[1])
 	h.Date = hElem[2]
-	h.From = hElem[3]
-	h.Resource = hElem[4]
-	h.RandString = string(Decode64(hElem[5]))
-	h.Counter, _ = strconv.Atoi(string(Decode64(hElem[6])))
+	h.Resource = hElem[3]
+	h.RandString = string(Decode64(hElem[4]))
+	h.Counter, _ = strconv.Atoi(string(Decode64(hElem[5])))
 }

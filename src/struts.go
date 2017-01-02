@@ -7,6 +7,7 @@ import (
 type Mail struct{
 	Header string `json:"header"` //
 	Proof_of_Work string `json:"proof_of_work"` //SHA1 hash value of 'header'
+	From string `json:"from"`//From field
 	Payload string `json:"payload"` //encrypted with symmetric key; format = {PoW//\\FROM//\\TO//\\MESSAGE//\\SIGNATURE}
 	SymKey string `json:"symmkey"`//symmetric key encrypted with "to" public key; SymKey in base64
 }
@@ -14,7 +15,6 @@ type Mail struct{
 type Header struct{
 	ZeroCount int //num of most significant zero bits required for hash digest
 	Date string //Date
-	From string //From field
 	Resource string //"To" field from Mail
 	RandString string //randomly generated string
 	Counter int //counter
@@ -28,4 +28,3 @@ func ( m *Mail) AddField(index int, content string) {
 	fieldValue := mValue.Field(index)// Field(index) returns Value of field with index "index"
 	fieldValue.SetString(content)//set actual field value
 }
-
