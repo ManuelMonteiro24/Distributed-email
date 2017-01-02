@@ -225,7 +225,6 @@ func (rn *realNetworking) listen() error {
 		go func(conn net.Conn) {
 			for {
 				// Wait for messages
-
 				msg, err := deserializeMessage(conn)
 				if err != nil {
 					if err.Error() == "EOF" {
@@ -239,7 +238,6 @@ func (rn *realNetworking) listen() error {
 
 				if !areNodesEqual(msg.Receiver, rn.self, isPing) {
 					// TODO should we penalize this node somehow ? Ban it ?
-
 					continue
 				}
 

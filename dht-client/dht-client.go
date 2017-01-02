@@ -1,15 +1,18 @@
 package main
 
 import (
-	//"bytes"
+	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"distmail/kademlia"
 	"flag"
 	"fmt"
+	//"io/ioutil"
+	"encoding/gob"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
-    "io/ioutil"
 
 	"gopkg.in/readline.v1"
 )
@@ -21,15 +24,15 @@ func main() {
 	var bPort = flag.String("bport", "", "Port to bootstrap against")
 	var help = flag.Bool("help", false, "Display Help")
 	var stun = flag.Bool("stun", true, "Use STUN")
-	var pkeyfile = flag.String("pkeyfile", "", "File containing PGP private key")
-	var username = flag.String("username", "", "Username")
+	//var pkeyfile = flag.String("pkeyfile", "", "File containing PGP private key")
+	//var username = flag.String("username", "", "Username")
 
 	flag.Parse()
 
-	if *username == "" {
-		displayFlagHelp()
-		os.Exit(0)
-	}
+	//if *username == "" {
+	//	displayFlagHelp()
+	//	os.Exit(0)
+	//}
 
 	if *help {
 		displayFlagHelp()
@@ -46,15 +49,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *pkeyfile == "" {
-		displayFlagHelp()
-		os.Exit(0)
-	}
-
-	node_entity, err := kademlia.GetEntityFromFile(*pkeyfile)
-	if err != nil {
-		panic(err)
-	}
+	//if *pkeyfile == "" {
+	//	displayFlagHelp()
+	//	os.Exit(0)
+	//}
 
 	var bootstrapNodes []*kademlia.NetworkNode
 	if *bIP != "" || *bPort != "" {
@@ -67,8 +65,6 @@ func main() {
 		IP:             *ip,
 		Port:           *port,
 		UseStun:        *stun,
-		ID:             node_entity.PrimaryKey.Fingerprint[:],
-		PublicEntity:   node_entity,
 	}
 
 	dht, err := kademlia.NewDHT(&kademlia.MemoryStore{}, &options)
@@ -111,9 +107,10 @@ func main() {
 		}
 	}()
 
-    pkeyb, err := ioutil.ReadFile(*pkeyfile)
+	//TODO : read private key from file
+	privkey, err := rsa.GenerateKey(rand.Reader, 2048)
+	public_key_id, err := dht.Store(serializePublicKey(&privkey.PublicKey))
 
-	public_key_id, err := dht.Store(pkeyb, true, *username)
 	fmt.Println("Stored public key with Id: " + public_key_id)
 
 	rl, err := readline.New("> ")
@@ -136,7 +133,7 @@ func main() {
 				displayHelp()
 				continue
 			}
-			id, err := dht.Store([]byte(input[1]), false, "")
+			id, err := dht.Store([]byte(input[1]))
 			if err != nil {
 				fmt.Println(err.Error())
 			}
@@ -165,6 +162,29 @@ func main() {
 			fmt.Println("Known Nodes: " + strconv.Itoa(nodes))
 		}
 	}
+}
+
+func serializePublicKey(pubkey *rsa.PublicKey) []byte {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(pubkey)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+func deserializePublicKey(pkeyBytes []byte) *rsa.PublicKey {
+	reader := bytes.NewBuffer(pkeyBytes)
+	pubkey := &rsa.PublicKey{}
+	dec := gob.NewDecoder(reader)
+
+	err := dec.Decode(pubkey)
+	if err != nil {
+		panic(err)
+	}
+
+	return pubkey
 }
 
 func displayFlagHelp() {

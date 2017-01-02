@@ -2,19 +2,36 @@ package kademlia
 
 import (
 	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/gob"
-	"golang.org/x/crypto/openpgp"
-	"math/rand"
+	"io"
 )
 
 type Onion struct {
-	Next node
+	Next NetworkNode
 	Data []byte
+}
+
+func randInt() int {
+	randBytes := make([]byte, 8)
+	rand.Read(randBytes)
+	randReader := bytes.NewBuffer(randBytes)
+	rando, err := binary.ReadUvarint(randReader)
+	if err != nil {
+		panic(err)
+	}
+	return int(rando)
 }
 
 func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
 	// get at most 3 random nodes from the client's bucket, to build the onion circuit
 	var buc, l, e int
+
 	var extracted [160]int
 	n := ht.totalNodes()
 
@@ -23,7 +40,7 @@ func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
 	}
 
 	for len(onion_nodes) < n {
-		buc = rand.Intn(160)
+		buc = randInt() % 160
 		l = len(ht.RoutingTable[buc])
 		e = extracted[buc]
 		if l > e {
@@ -35,51 +52,116 @@ func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
 	return onion_nodes
 }
 
-func buildOnion(onion_nodes []*node, data []byte) ([]byte, error) {
+func BuildOnion(pubkeys []*rsa.PublicKey, nodes []*NetworkNode, data []byte) ([]byte, error) {
 	// build onion from data, given nodes and their keys
-	enc_buf := new(bytes.Buffer)
-	ent, err := onion_nodes[0].DeserializeEntity()
-	if err != nil {
-		panic(err)
-	}
 
-	dummy_list := []*openpgp.Entity{ent}
-	plaintext, err := openpgp.Encrypt(enc_buf, dummy_list, nil, nil, nil)
-
-	plaintext.Write(data)
-	plaintext.Close()
+	cipher := Encrypt(pubkeys[0], data)
 
 	onion := Onion{
-		*onion_nodes[0],
-		enc_buf.Bytes(),
+		*nodes[0],
+		cipher,
 	}
 
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
-	err = enc.Encode(onion)
+	err := enc.Encode(onion)
 	if err != nil {
-		return nil, nil
+		panic(err)
 	}
 
-	if len(onion_nodes) > 1 {
-		return buildOnion(onion_nodes[1:], buf.Bytes())
+	if len(pubkeys) > 1 {
+		return BuildOnion(pubkeys[1:], nodes[1:], buf.Bytes())
 	} else {
 		return buf.Bytes(), nil
 	}
 }
 
-func removeOnionLayer(onion Onion, ent *openpgp.Entity) ([]byte, error) {
+func RemoveOnionLayer(onion Onion, privkey *rsa.PrivateKey) ([]byte, error) {
 	// the function name is self-explaining
-	buf := bytes.NewBuffer(onion.Data)
-	var dummy_list openpgp.EntityList
-	dummy_list = append(dummy_list, ent)
-	md, err := openpgp.ReadMessage(buf, dummy_list, nil, nil)
+	result := Decrypt(privkey, onion.Data)
+	if len(result) > 0 {
+		return result, nil
+	} else {
+		panic("error decrypting onion")
+	}
+}
+
+func DecryptOnion(data []byte) (Onion, error) {
+	oni := &Onion{}
+
+	reader := bytes.NewBuffer(data)
+	dec := gob.NewDecoder(reader)
+	err := dec.Decode(oni)
 	if err != nil {
-		return nil, err
+		panic(err)
+	}
+	return *oni, nil
+}
+
+func Encrypt(pubkey *rsa.PublicKey, data []byte) []byte {
+	key := make([]byte, 16)
+	_, err := rand.Read(key)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		panic(err)
 	}
 
-	data_buf := new(bytes.Buffer)
-	data_buf.ReadFrom(md.UnverifiedBody)
+	ciphertext := make([]byte, aes.BlockSize+len(data))
+	iv := ciphertext[:aes.BlockSize]
 
-	return data_buf.Bytes(), nil
+	_, err = io.ReadFull(rand.Reader, iv)
+	if err != nil {
+		panic(err)
+	}
+
+	stream := cipher.NewCFBEncrypter(block, iv)
+	stream.XORKeyStream(ciphertext[aes.BlockSize:], data)
+
+	enc_sym_key, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubkey, key, []byte(""))
+	if err != nil {
+		panic(err)
+	}
+
+	var keyLengthBytes [8]byte
+	binary.PutUvarint(keyLengthBytes[:], uint64(len(enc_sym_key)))
+
+	var result []byte
+
+	result = append(result, keyLengthBytes[:]...)
+	result = append(result, enc_sym_key[:]...)
+	result = append(result, ciphertext[:]...)
+
+	return result
+}
+
+func Decrypt(privkey *rsa.PrivateKey, data []byte) []byte {
+	keyLengthBytes := data[:8]
+	lengthReader := bytes.NewBuffer(keyLengthBytes)
+	length, err := binary.ReadUvarint(lengthReader)
+	if err != nil {
+		panic(err)
+	}
+
+	enc_sym_key := data[8 : 8+length]
+	ciphertext := data[8+length:]
+
+	sym_key, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, privkey, enc_sym_key, []byte(""))
+	if err != nil {
+		panic(err)
+	}
+
+	block, err := aes.NewCipher(sym_key)
+	if err != nil {
+		panic(err)
+	}
+
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+
+	stream := cipher.NewCFBDecrypter(block, iv)
+
+	stream.XORKeyStream(ciphertext, ciphertext)
+
+	return ciphertext
 }

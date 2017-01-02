@@ -3,7 +3,6 @@ package kademlia
 import (
 	"bytes"
 	"errors"
-	"golang.org/x/crypto/openpgp"
 	"log"
 	"math"
 	"sort"
@@ -68,9 +67,6 @@ type Options struct {
 
 	// The maximum time to wait for a response to any message
 	TMsgTimeout time.Duration
-
-	// OpenPGP Entity of this node
-	PublicEntity *openpgp.Entity
 }
 
 // NewDHT initializes a new DHT node. A store and options struct must be
@@ -143,13 +139,8 @@ func (dht *DHT) getExpirationTime(key []byte) time.Time {
 
 // Store stores data on the network. This will trigger an iterateStore message.
 // The base58 encoded identifier will be returned if the store is successful.
-func (dht *DHT) Store(data []byte, store_entity bool, username string) (id string, err error) {
-	var key []byte
-	if !store_entity {
-		key = dht.store.GetKey(data)
-	} else {
-		key = dht.store.GetKey([]byte(username))
-	}
+func (dht *DHT) Store(data []byte) (id string, err error) {
+	key := dht.store.GetKey(data)
 	expiration := dht.getExpirationTime(key)
 	replication := time.Now().Add(dht.options.TReplicate)
 	dht.store.Store(key, data, replication, expiration, true)
@@ -257,7 +248,7 @@ func (dht *DHT) Bootstrap() error {
 		if bn.ID == nil {
 			res, err := dht.networking.sendMessage(query, true, -1)
 			if err != nil {
-				panic(err)
+				continue
 			}
 			wg.Add(1)
 			expectedResponses = append(expectedResponses, res)
@@ -535,7 +526,6 @@ func (dht *DHT) addNode(node *node) {
 		query.Receiver = n
 		query.Sender = dht.ht.Self
 		query.Type = messageTypePing
-
 		res, err := dht.networking.sendMessage(query, true, -1)
 		if err != nil {
 			bucket = append(bucket, node)
