@@ -52,10 +52,25 @@ func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
 	return onion_nodes
 }
 
-func BuildOnion(pubkeys []*rsa.PublicKey, nodes []*NetworkNode, data []byte) ([]byte, error) {
+func (dht *DHT) getNodePubKey(node *NetworkNode) *rsa.PublicKey {
+	pubkeyBytes, found, err := dht.Get(Hashit(dht.GetSelfID()))
+
+	if !found {
+		panic("failed to retrieve node public key")
+	}
+	if err != nil {
+		panic(err)
+	}
+
+	return DeserializePublicKey(pubkeyBytes)
+}
+
+func BuildOnion(dht *DHT, nodes []*NetworkNode, data []byte) ([]byte, error) {
 	// build onion from data, given nodes and their keys
 
-	cipher := Encrypt(pubkeys[0], data)
+	pubkey := dht.getNodePubKey(nodes[0])
+
+	cipher := Encrypt(pubkey, data)
 
 	onion := Onion{
 		*nodes[0],
@@ -69,8 +84,8 @@ func BuildOnion(pubkeys []*rsa.PublicKey, nodes []*NetworkNode, data []byte) ([]
 		panic(err)
 	}
 
-	if len(pubkeys) > 1 {
-		return BuildOnion(pubkeys[1:], nodes[1:], buf.Bytes())
+	if len(nodes) > 1 {
+		return BuildOnion(dht, nodes[1:], buf.Bytes())
 	} else {
 		return buf.Bytes(), nil
 	}
@@ -164,4 +179,27 @@ func Decrypt(privkey *rsa.PrivateKey, data []byte) []byte {
 	stream.XORKeyStream(ciphertext, ciphertext)
 
 	return ciphertext
+}
+
+func SerializePublicKey(pubkey *rsa.PublicKey) []byte {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	err := enc.Encode(pubkey)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+func DeserializePublicKey(pkeyBytes []byte) *rsa.PublicKey {
+	reader := bytes.NewBuffer(pkeyBytes)
+	pubkey := &rsa.PublicKey{}
+	dec := gob.NewDecoder(reader)
+
+	err := dec.Decode(pubkey)
+	if err != nil {
+		panic(err)
+	}
+
+	return pubkey
 }

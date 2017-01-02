@@ -2,6 +2,8 @@ package kademlia
 
 import (
 	"bytes"
+	"crypto/rsa"
+	"crypto/sha1"
 	"errors"
 	"log"
 	"math"
@@ -67,6 +69,9 @@ type Options struct {
 
 	// The maximum time to wait for a response to any message
 	TMsgTimeout time.Duration
+
+	// this node's RSA priv key
+	PrivKey *rsa.PrivateKey
 }
 
 // NewDHT initializes a new DHT node. A store and options struct must be
@@ -139,8 +144,13 @@ func (dht *DHT) getExpirationTime(key []byte) time.Time {
 
 // Store stores data on the network. This will trigger an iterateStore message.
 // The base58 encoded identifier will be returned if the store is successful.
-func (dht *DHT) Store(data []byte) (id string, err error) {
-	key := dht.store.GetKey(data)
+func (dht *DHT) Store(data []byte, ID string, useid bool) (id string, err error) {
+	var key []byte
+	if !useid {
+		key = dht.store.GetKey(data)
+	} else {
+		key = b58.Decode(ID)
+	}
 	expiration := dht.getExpirationTime(key)
 	replication := time.Now().Add(dht.options.TReplicate)
 	dht.store.Store(key, data, replication, expiration, true)
@@ -629,10 +639,75 @@ func (dht *DHT) listen() {
 				response.Receiver = msg.Sender
 				response.Type = messageTypePing
 				dht.networking.sendMessage(response, false, msg.ID)
+			case messageTypeOnion:
+				onion, err := DecryptOnion(msg.Data.([]byte))
+				if err != nil {
+					// onion data is another onion, send it forward
+					inner_onion, err := RemoveOnionLayer(onion, dht.options.PrivKey)
+					if err != nil {
+						panic(err)
+					}
+					response := &message{IsResponse: false}
+					response.Sender = dht.ht.Self
+					response.Receiver = &onion.Next
+					response.Type = messageTypeOnion
+					response.Data = inner_onion
+					dht.networking.sendMessage(response, false, msg.ID)
+				} else {
+					// onion data is a message to be stored
+					id := b58.Encode(onion.Next.ID)
+					_, lastID := dht.Lookup(id, 20)
+					dht.Store(onion.Data, lastID, true)
+				}
 			}
 		case <-dht.networking.getDisconnect():
 			dht.networking.messagesFin()
 			return
 		}
 	}
+}
+
+func (dht *DHT) SendEmail(dest string, email string) {
+
+	onion_nodes := getRandomNodesForOnion(dht.ht)
+	first_node := onion_nodes[0]
+	onion_nodes = onion_nodes[1:]
+
+	onion, err := BuildOnion(dht, onion_nodes, []byte(email))
+	if err != nil {
+		panic(err)
+	}
+
+	msg := &message{IsResponse: false}
+	msg.Sender = dht.ht.Self
+	msg.Receiver = first_node
+	msg.Type = messageTypeOnion
+	msg.Data = onion
+	dht.networking.sendMessage(msg, false, 0)
+
+}
+
+func (dht *DHT) Lookup(ID string, max_tries int) ([][]byte, string) {
+	var value []byte
+	var exists bool
+	var err error
+
+	lastID := Hashit(Hashit(ID))
+	results := make([][]byte, 0)
+	for i := 0; i < max_tries; i++ {
+		value, exists, err = dht.Get(lastID)
+		if err != nil {
+			panic(err)
+		}
+		if exists {
+			results = append(results, value)
+		}
+		lastID = Hashit(lastID)
+	}
+	return results, lastID
+}
+
+func Hashit(id string) string {
+	hash := sha1.Sum([]byte(id))
+	return b58.Encode(hash[:])
 }
