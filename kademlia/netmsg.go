@@ -109,7 +109,7 @@ func deserializeMessage(conn io.Reader) (*message, error) {
 
 	err = dec.Decode(msg)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return msg, nil

@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+    "io/ioutil"
 
 	"gopkg.in/readline.v1"
 )
@@ -110,7 +111,9 @@ func main() {
 		}
 	}()
 
-	public_key_id, err := dht.Store([]byte(SecureRandomAlphaString(990)), true, *username)
+    pkeyb, err := ioutil.ReadFile(*pkeyfile)
+
+	public_key_id, err := dht.Store(pkeyb, true, *username)
 	fmt.Println("Stored public key with Id: " + public_key_id)
 
 	rl, err := readline.New("> ")
