@@ -3,7 +3,6 @@ package kademlia
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"golang.org/x/crypto/openpgp"
 	"log"
 	"math"
@@ -278,7 +277,6 @@ func (dht *DHT) Bootstrap() error {
 					// If result is nil, channel was closed
 					if result != nil {
 						dht.addNode(newNode(result.Sender))
-						fmt.Println("adding node %v", result.Sender)
 					}
 					wg.Done()
 					return
@@ -641,19 +639,10 @@ func (dht *DHT) listen() {
 				response.Receiver = msg.Sender
 				response.Type = messageTypePing
 				dht.networking.sendMessage(response, false, msg.ID)
-			case messageTypeKeyExchange:
-				response := &message{IsResponse: true}
-				response.Sender = dht.ht.Self
-				response.Receiver = msg.Sender
-				response.Type = messageTypeKeyExchange
 			}
 		case <-dht.networking.getDisconnect():
 			dht.networking.messagesFin()
 			return
 		}
 	}
-}
-
-func (dht *DHT) GetSerializedPublicEntity() []byte {
-	return dht.ht.SelfPublicEntity
 }

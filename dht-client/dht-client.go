@@ -1,6 +1,7 @@
 package main
 
 import (
+	//"bytes"
 	"distmail/kademlia"
 	"flag"
 	"fmt"
@@ -109,8 +110,7 @@ func main() {
 		}
 	}()
 
-	public_key_id, err := dht.Store(dht.GetSerializedPublicEntity(), true, *username)
-
+	public_key_id, err := dht.Store([]byte(SecureRandomAlphaString(990)), true, *username)
 	fmt.Println("Stored public key with Id: " + public_key_id)
 
 	rl, err := readline.New("> ")
@@ -177,7 +177,8 @@ Options:
     --bip=<ip> Bootstrap IP
     --bport=<port> Bootstrap Port
     --stun=<bool> Use STUN protocol for public addr discovery [default: true]
-    --pkeyfile=<string> File containing private PGP key`)
+    --pkeyfile=<string> File containing private PGP key
+    --username=<string>`)
 }
 
 func displayHelp() {

@@ -143,7 +143,6 @@ func (rn *realNetworking) createSocket(host string, port string, useStun bool, s
 }
 
 func (rn *realNetworking) sendMessage(msg *message, expectResponse bool, id int64) (*expectedResponse, error) {
-	fmt.Printf("sent %v \n\n", msg)
 	rn.mutex.Lock()
 	if id == -1 {
 		id = rn.msgCounter
@@ -228,7 +227,6 @@ func (rn *realNetworking) listen() error {
 				// Wait for messages
 
 				msg, err := deserializeMessage(conn)
-				fmt.Printf("got %v \n", msg)
 				if err != nil {
 					if err.Error() == "EOF" {
 						// Node went bye bye

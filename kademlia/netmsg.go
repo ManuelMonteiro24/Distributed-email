@@ -13,7 +13,6 @@ const (
 	messageTypeStore
 	messageTypeFindNode
 	messageTypeFindValue
-	messageTypeKeyExchange
 )
 
 type message struct {
@@ -70,9 +69,10 @@ func serializeMessage(q *message) ([]byte, error) {
 	}
 
 	length := msgBuffer.Len()
-	fmt.Println(length)
 
-	var lengthBytes [16]byte
+	fmt.Printf("sent %v bytes\n", length)
+
+	var lengthBytes [8]byte
 	binary.PutUvarint(lengthBytes[:], uint64(length))
 
 	var result []byte
@@ -83,7 +83,7 @@ func serializeMessage(q *message) ([]byte, error) {
 }
 
 func deserializeMessage(conn io.Reader) (*message, error) {
-	lengthBytes := make([]byte, 16)
+	lengthBytes := make([]byte, 8)
 	_, err := conn.Read(lengthBytes)
 	if err != nil {
 		return nil, err
@@ -91,10 +91,11 @@ func deserializeMessage(conn io.Reader) (*message, error) {
 
 	lengthReader := bytes.NewBuffer(lengthBytes)
 	length, err := binary.ReadUvarint(lengthReader)
-	fmt.Println(length)
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Printf("got %v bytes\n", length)
 
 	msgBytes := make([]byte, length)
 	_, err = conn.Read(msgBytes)
@@ -108,7 +109,7 @@ func deserializeMessage(conn io.Reader) (*message, error) {
 
 	err = dec.Decode(msg)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 
 	return msg, nil
