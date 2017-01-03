@@ -40,7 +40,6 @@ func RndStr(n int) string {
 	var a int
 	for i := range rndBytes{
 		a = RndInt(len(letterArray))
-		fmt.Println("RNDSTRING ",RndInt(len(letterArray)))
 		rndBytes[i] = letterArray[a]
 	}
 	return string(rndBytes)

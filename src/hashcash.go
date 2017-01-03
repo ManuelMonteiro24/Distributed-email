@@ -31,10 +31,8 @@ func CheckZeroBits(b []byte, zeroBits int) bool {
 	for i := range b {
 		if b[i] == 0x00 {
 			counter = counter + 8
-			fmt.Println("CHECK: 1", counter)
 		} else if float64(b[i]) < math.Pow(float64(2), float64(n)) {
 			counter = counter + 8-n
-			fmt.Println("CHECK: 2", counter)
 		}
 		//Break condition
 		if counter >= zeroBits {
