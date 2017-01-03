@@ -335,7 +335,7 @@ func pwd(){
 	_, err = os.Stat("users_list.txt")
 
 	if os.IsNotExist(err){
-		var users_list, err = os.Create(users_list)
+		users_file, err := os.Create(users_list)
 		checkError(err)
 		defer users_list.Close()
 	}
@@ -345,11 +345,23 @@ func pwd(){
 		pwd := DataInput("Insert Password:\n")
 
 		if(flag = 1){
-			pow = HashDigest(pwd + salt)
+			 //= HashDigest(pwd + salt)
 
 		}
 		if(flag = 2){
+			salt := make([]byte, 32)
+		  _, err := io.ReadFull(rand.Reader, salt)
+		  checkError(err)
 
+    	scanner := bufio.NewScanner(users_file)
+    	for scanner.Scan() {
+				plParts := strings.Split(scanner.Text(), "//\\\\")
+
+    	}
+
+    	if err := scanner.Err(); err != nil {
+      	log.Fatal(err)
+    	}
 		}
 
 	}else{
