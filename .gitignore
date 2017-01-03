@@ -1,3 +1,5 @@
 *.key
 *.swp
 old
+*travis*
+kademlia/cmd

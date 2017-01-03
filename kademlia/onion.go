@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
+	b58 "github.com/jbenet/go-base58"
 	"io"
 )
 
@@ -52,8 +53,8 @@ func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
 	return onion_nodes
 }
 
-func (dht *DHT) getNodePubKey(node *NetworkNode) *rsa.PublicKey {
-	pubkeyBytes, found, err := dht.Get(Hashit(dht.GetSelfID()))
+func (dht *DHT) GetPubKeyByID(ID string) *rsa.PublicKey {
+	pubkeyBytes, found, err := dht.Get(Hashit(ID))
 
 	if !found {
 		panic("failed to retrieve node public key")
@@ -65,10 +66,15 @@ func (dht *DHT) getNodePubKey(node *NetworkNode) *rsa.PublicKey {
 	return DeserializePublicKey(pubkeyBytes)
 }
 
+func (dht *DHT) GetNodePubKey(node *NetworkNode) *rsa.PublicKey {
+	IDstr := b58.Encode(node.ID)
+	return dht.GetPubKeyByID(IDstr)
+}
+
 func BuildOnion(dht *DHT, nodes []*NetworkNode, data []byte) ([]byte, error) {
 	// build onion from data, given nodes and their keys
 
-	pubkey := dht.getNodePubKey(nodes[0])
+	pubkey := dht.GetNodePubKey(nodes[0])
 
 	cipher := Encrypt(pubkey, data)
 

@@ -22,6 +22,8 @@ type DHT struct {
 	store      Store
 }
 
+type ExtractorFunc func(data []byte) string
+
 // Options contains configuration options for the local node
 type Options struct {
 	ID []byte
@@ -72,6 +74,9 @@ type Options struct {
 
 	// this node's RSA priv key
 	PrivKey *rsa.PrivateKey
+
+	// Id extraction from e-mail function
+	mailExtractor ExtractorFunc
 }
 
 // NewDHT initializes a new DHT node. A store and options struct must be
@@ -655,8 +660,8 @@ func (dht *DHT) listen() {
 					dht.networking.sendMessage(response, false, msg.ID)
 				} else {
 					// onion data is a message to be stored
-					id := b58.Encode(onion.Next.ID)
-					_, lastID := dht.Lookup(id, 20)
+					id := dht.options.mailExtractor(msg.Data.([]byte))
+					_, lastID := dht.Lookup(id, 10)
 					dht.Store(onion.Data, lastID, true)
 				}
 			}
@@ -667,13 +672,13 @@ func (dht *DHT) listen() {
 	}
 }
 
-func (dht *DHT) SendEmail(dest string, email string) {
+func (dht *DHT) SendEmail(email []byte) {
 
 	onion_nodes := getRandomNodesForOnion(dht.ht)
 	first_node := onion_nodes[0]
 	onion_nodes = onion_nodes[1:]
 
-	onion, err := BuildOnion(dht, onion_nodes, []byte(email))
+	onion, err := BuildOnion(dht, onion_nodes, email)
 	if err != nil {
 		panic(err)
 	}

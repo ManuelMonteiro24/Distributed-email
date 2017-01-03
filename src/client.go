@@ -1,37 +1,58 @@
 package main
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
-	"crypto"
+	"distmail/kademlia"
 	"encoding/pem"
 	"fmt"
-	"os"
-	"strings"
+	b58 "github.com/jbenet/go-base58"
 	"io/ioutil"
-	"time"
-	"strconv"
+	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 )
 
 const COUNTER_INTERVAL = 1000000
 
+//node ID is the SHA1 of its Public Key
+func userID(pubkey *rsa.PublicKey) [20]byte {
+	return sha1.Sum(kademlia.SerializePublicKey(pubkey))
+}
+
 func main() {
 
 	fmt.Printf("\nHello welcome to the Distributed email\n")
-  user_name, userKey:= AuthUser()
+	user_name, userKey := AuthUser()
+	ID := userID(&userKey.PublicKey)
 
-  for {
-    fmt.Printf("Main Menu\n 1.New email 2.Check your inbox 3. Exit\n")
-    Menu(user_name, userKey)
-  }
+	bIP := DataInput("bootstrapIP")
+	bPort := DataInput("bootstrapPort")
+
+	dht, _ := kademlia.InitDHT(ID[:], bIP, bPort, userKey, ExtractToIDfromMail)
+
+	for {
+		fmt.Printf("Main Menu\n 1.New email 2.Check your inbox 3. Exit\n")
+		Menu(user_name, userKey, dht)
+	}
+}
+
+func ExtractToIDfromMail(data []byte) string {
+	mail := ReadJSON(data)
+	var header Header
+	header.StringToHeader(mail.Header)
+
+	return header.Resource
 }
 
 /*Creates new Mail struct and fills its fields
 with the provided information; ready to be sent*/
-func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string, to string, from string) (mail Mail){
+func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string, to string, from string) (mail Mail) {
 	//create symmetric encryption key for AES encryption of payload
 	var h Header
 	var pow []byte
@@ -40,9 +61,8 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 	/*Fill header with mail specific info*/
 	h.ZeroCount = 20
 	h.Date = CreateDate(t)
-	rsrc, err := x509.MarshalPKIXPublicKey(toPublicKey)
-	checkError(err)
-	h.Resource = Encode64(rsrc)//Para ler de volta, usar -- bytes, err, := x509.ParsePKIXPublicKey(Decode64(h.Resource))
+	rsrc := userID(toPublicKey)
+	h.Resource = b58.Encode(rsrc[:])
 	h.RandString = RndStr(12) //random 12 byte string
 	h.Counter = RndInt(COUNTER_INTERVAL)
 
@@ -50,8 +70,8 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 	header := h.HeaderToString() //header in string format
 	pow = HashDigest(header)
 
-	for !CheckZeroBits(pow, h.ZeroCount)  {
-		h.IncCounter()//increment counter to create new digest
+	for !CheckZeroBits(pow, h.ZeroCount) {
+		h.IncCounter() //increment counter to create new digest
 		header = h.HeaderToString()
 		pow = HashDigest(header)
 	}
@@ -68,7 +88,7 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 	/*Encrypt (payload + signature) and from field with symKey*/
 	symKey := GenSymKey()
 	mail.From = SymEncrypt(symKey, from)
-	mail.Payload = SymEncrypt(symKey, payload + "//\\\\" + payloadSignature) //Payload encrypted with symKey, encoded in Base64
+	mail.Payload = SymEncrypt(symKey, payload+"//\\\\"+payloadSignature) //Payload encrypted with symKey, encoded in Base64
 
 	/*Encrypt symKey with recipient toPublicKey*/
 	encSymKey, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, toPublicKey, symKey, []byte(""))
@@ -79,10 +99,10 @@ func NewMail(userKey *rsa.PrivateKey, toPublicKey *rsa.PublicKey, message string
 }
 
 /*Reads Mail using user PrivateKey and sender PublicKey*/
-func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
+func ReadMail(userKey *rsa.PrivateKey, mail Mail, dht *kademlia.DHT) {
 
 	/*Integrity check*/
-	if mail.Proof_of_Work != Encode64(HashDigest(mail.Header)){
+	if mail.Proof_of_Work != Encode64(HashDigest(mail.Header)) {
 		fmt.Print("Mail may be spam or was illicitly altered!! (pow test fail)\n")
 		return
 	}
@@ -102,10 +122,13 @@ func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
 	/*Retrieve payload*/
 	payload := SymDecrypt(symKey, mail.Payload)
 	from := SymDecrypt(symKey, mail.From)
+
+	senderKey := dht.GetPubKeyByID(from)
+
 	plParts := strings.Split(payload, "//\\\\")
 
 	/*Check for valid sender signature*/
-	d := HashDigest(strings.Replace(payload, "//\\\\" + plParts[4], "", -1))
+	d := HashDigest(strings.Replace(payload, "//\\\\"+plParts[4], "", -1))
 	if !CheckSign(d, []byte(Decode64(plParts[4])), senderKey) {
 		fmt.Print("Mail illicitly altered or corrupt!! (signature mismatch)")
 		return
@@ -117,8 +140,8 @@ func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
 
 /*Signs digest with priv private key
 Returns signature in string format, encoded in Base64
- */
-func Sign(digest []byte, priv *rsa.PrivateKey) string{
+*/
+func Sign(digest []byte, priv *rsa.PrivateKey) string {
 	var opts rsa.PSSOptions
 	opts.SaltLength = rsa.PSSSaltLengthAuto //for simplicity
 	signature, err := rsa.SignPSS(rand.Reader, priv, crypto.SHA1, digest, &opts)
@@ -129,12 +152,12 @@ func Sign(digest []byte, priv *rsa.PrivateKey) string{
 /*Check signature with senderKey and digest
  *Returns true if signature is valid and false otherwise
  */
-func CheckSign(digest []byte, signature []byte, senderKey *rsa.PublicKey) bool{
+func CheckSign(digest []byte, signature []byte, senderKey *rsa.PublicKey) bool {
 	var opts rsa.PSSOptions
 	opts.SaltLength = rsa.PSSSaltLengthAuto
 	if rsa.VerifyPSS(senderKey, crypto.SHA1, digest, signature, &opts) == nil {
 		return true
-	}else {
+	} else {
 		return false
 	}
 }
@@ -176,7 +199,7 @@ func AuthUser() (string, *rsa.PrivateKey) {
 	checkError(err)
 
 	user_name := DataInput("Insert Username: ")
-	userPriv := filepath.Join(subpath, user_name + "_PrivateKey")
+	userPriv := filepath.Join(subpath, user_name+"_PrivateKey")
 	_, err = os.Stat(userPriv)
 
 	// detect if key file associated to user exists
@@ -194,7 +217,7 @@ func AuthUser() (string, *rsa.PrivateKey) {
 		//encode key to file
 		pemdata := pem.EncodeToMemory(
 			&pem.Block{
-				Type: "RSA PRIVATE KEY",
+				Type:  "RSA PRIVATE KEY",
 				Bytes: x509.MarshalPKCS1PrivateKey(userKey),
 			},
 		)
@@ -207,24 +230,24 @@ func AuthUser() (string, *rsa.PrivateKey) {
 
 		pemdata = pem.EncodeToMemory(
 			&pem.Block{
-				Type: "RSA PUBLIC KEY",
+				Type:  "RSA PUBLIC KEY",
 				Bytes: PublicKey,
 			},
 		)
 
-		userPub := filepath.Join(subpath, user_name + "_PublicKey")
+		userPub := filepath.Join(subpath, user_name+"_PublicKey")
 		contact_file, err := os.Create(userPub)
 		checkError(err)
 		defer contact_file.Close()
 
 		ioutil.WriteFile(userPub, pemdata, 0644)
 
-		fmt.Printf("User keys generated!\n")
+		fmt.Printf("User keys generated!")
 		return user_name, userKey
 
-	}else{
+	} else {
 		//load user key from file
-		fmt.Printf("User login successful!\n")
+		fmt.Printf("User login successful!")
 		file_data, err := ioutil.ReadFile(userPriv)
 		checkError(err)
 		pemdata, _ := pem.Decode(file_data)
@@ -234,46 +257,73 @@ func AuthUser() (string, *rsa.PrivateKey) {
 		return user_name, userKey
 	}
 }
+
 /*
 func Pass_gen_or_check(user_name string){
 	rcv_pass := DataInput("Insert Password: ")
 }*/
 
-func Menu(user_name string, userKey *rsa.PrivateKey){
+func Sendit(user_name string, dest_name string, userKey *rsa.PrivateKey, dest_PublicKey *rsa.PublicKey, dht *kademlia.DHT) {
+	file_name := FileToSend()
+	fmt.Println("Sender:", user_name, "\nDest :", dest_name, "\nFile: ", file_name)
+	message := ReadFile(file_name)
+
+	fromID := userID(&userKey.PublicKey)
+	mail := NewMail(userKey, dest_PublicKey, message, dest_name, b58.Encode(fromID[:]))
+
+	fmt.Println()
+	mailBytes := WriteJSON(mail)
+
+	dht.SendEmail(mailBytes)
+}
+
+func Menu(user_name string, userKey *rsa.PrivateKey, dht *kademlia.DHT) {
 
 	var input int
 	n, err := fmt.Scanln(&input)
 	if n < 1 || n > 2 || err != nil {
-		fmt.Println("Invalid input\n")
+		fmt.Println("Invalid input")
 		return
 	}
 	switch input {
 	case 1:
-		fmt.Println("New email option chosen:\n")
-		dest_name, dest_PublicKey := RcvDest()
-		file_name := FileToSend()
-		fmt.Println("Sender:", user_name, "\nDest :", dest_name, "\nFile: ", file_name,"\n")
-		message := ReadFile(file_name)
-		mail := NewMail(userKey, dest_PublicKey, message, dest_name, user_name)
+		fmt.Println("New email option chosen:")
+		dest_name, dest_PublicKey, exists := RcvDest()
+		if exists {
+			Sendit(user_name, dest_name, userKey, dest_PublicKey, dht)
+		} else {
+			fmt.Println("Contact not stored.")
+			destID := DataInput("Insert dest ID:")
+			if destID != "" {
+				file_name := FileToSend()
+				dest_PublicKey = dht.GetPubKeyByID(destID)
+				if dest_PublicKey != nil {
+					Sendit(user_name, dest_name, userKey, dest_PublicKey, dht)
+				}
 
-		fmt.Println()
-
-		WriteJSON(mail)
+			}
+		}
 
 	case 2:
-		fmt.Println("Check inbox option chosen\n")
-		rcvMail := ReadJSON("mail_ready.json")
-		_, pub := RcvDest()
-		ReadMail(userKey, pub, rcvMail)
+		fmt.Println("Check inbox option chosen")
+
+		user_id := userID(&userKey.PublicKey)
+		results, _ := dht.Lookup(b58.Encode(user_id[:]), 10)
+
+		for _, result := range results {
+			rcvMail := ReadJSON(result)
+			ReadMail(userKey, rcvMail, dht)
+		}
+
 	case 3:
-		fmt.Println("Goodbye thank you for choosing us\n")
+		fmt.Println("Goodbye thank you for choosing us")
 		os.Exit(0)
 	default:
-		fmt.Println("Invalid Input\n")
+		fmt.Println("Invalid Input")
 	}
 }
 
-func RcvDest() (string, *rsa.PublicKey){
+func RcvDest() (string, *rsa.PublicKey, bool) {
 
 	//check if Contacts dir exists if not creates one
 	rootpath, _ := os.Getwd()
@@ -284,25 +334,25 @@ func RcvDest() (string, *rsa.PublicKey){
 	var recp_name = DataInput("Insert Recipient: ")
 
 	//Check if contact exists
-	subpath = filepath.Join(subpath, recp_name + "_PublicKey")
+	subpath = filepath.Join(subpath, recp_name+"_PublicKey")
 	_, err := os.Stat(subpath)
 
 	if os.IsNotExist(err) {
-		fmt.Printf("No such contact in Contacts list!\n")
-		os.Exit(3)
+		fmt.Printf("No such contact in Contacts list!")
+		return recp_name, nil, false
 	}
 
-	fmt.Println("Contact found!\n")
+	fmt.Println("Contact found!")
 	file_data, err := ioutil.ReadFile(subpath)
 	checkError(err)
 	pemdata, _ := pem.Decode(file_data)
 	pub, err := x509.ParsePKIXPublicKey(pemdata.Bytes)
 	checkError(err)
 
-	return recp_name, pub.(*rsa.PublicKey)
+	return recp_name, pub.(*rsa.PublicKey), true
 }
 
-func FileToSend()(string){
+func FileToSend() string {
 	//recieve name of file
 	var file_name = DataInput("Insert name of file to send: ")
 
@@ -311,24 +361,25 @@ func FileToSend()(string){
 	if os.IsNotExist(err) {
 		fmt.Println(err.Error())
 		os.Exit(3)
-	} else{
-		fmt.Println("File found!\n")
+	} else {
+		fmt.Println("File found!")
 	}
 	return file_name
 }
 
-func DataInput(msg string) (string){
-	for{
+func DataInput(msg string) string {
+	for {
 		var data string
 		fmt.Println(msg)
 		n, err := fmt.Scanln(&data)
 		if n < 1 || n > 2 || err != nil {
-			fmt.Println("Invalid input\n")
-		}else{
+			fmt.Println("Invalid input")
+		} else {
 			return data
 		}
 	}
 }
+
 /*
 func pwd(){
 	//check if Users list file, with the passwords exists if not creates one
