@@ -19,17 +19,14 @@ import (
 const COUNTER_INTERVAL = 1000000
 
 func main() {
-    fmt.Printf("\nHello welcome to the Distributed email\n")
-    user_name, userKey:= AuthUser()
-    //fmt.Println("User_name: ", user_name)
-    //fmt.Println("User_key: ", userKey)
 
-    for {
-        fmt.Printf("Main Menu\n 1.New email 2.Check your inbox 3. Exit\n")
-        Menu(user_name, userKey)
-    }
+	fmt.Printf("\nHello welcome to the Distributed email\n")
+  user_name, userKey:= AuthUser()
 
-
+  for {
+    fmt.Printf("Main Menu\n 1.New email 2.Check your inbox 3. Exit\n")
+    Menu(user_name, userKey)
+  }
 }
 
 /*Creates new Mail struct and fills its fields
@@ -98,7 +95,7 @@ func ReadMail(userKey *rsa.PrivateKey, senderKey *rsa.PublicKey, mail Mail) {
 	if header.Resource == Encode64(pub) {
 		fmt.Print("Header.Resource == userKey.PublicKey\n")
 	}
-	
+
 	/*Retrieve symKey*/
 	symKey, err := rsa.DecryptOAEP(sha1.New(), rand.Reader, userKey, Decode64(mail.SymKey), []byte(""))
 	checkError(err)
@@ -177,16 +174,6 @@ func AuthUser() (string, *rsa.PrivateKey) {
 	subpath := filepath.Join(rootpath, "Users")
 	err := os.MkdirAll(subpath, os.ModePerm)
 	checkError(err)
-
-	//check if Users list file, with the passwords exists if not creates one
-	users_list := filepath.Join(subpath,"users_list.txt")
-	_, err = os.Stat(users_list)
-
-	if os.IsNotExist(err){
-		var users_list, err = os.Create(users_list)
-		checkError(err)
-		defer users_list.Close()
-	}
 
 	user_name := DataInput("Insert Username: ")
 	userPriv := filepath.Join(subpath, user_name + "_PrivateKey")
@@ -342,3 +329,30 @@ func DataInput(msg string) (string){
 		}
 	}
 }
+/*
+func pwd(){
+	//check if Users list file, with the passwords exists if not creates one
+	_, err = os.Stat("users_list.txt")
+
+	if os.IsNotExist(err){
+		var users_list, err = os.Create(users_list)
+		checkError(err)
+		defer users_list.Close()
+	}
+	flag := DataInput("Press 1 for: Login Or 2 for: Sign up\n")
+	if(flag = 1 || flag =2){
+		username := DataInput("Insert Username:\n")
+		pwd := DataInput("Insert Password:\n")
+
+		if(flag = 1){
+			pow = HashDigest(pwd + salt)
+
+		}
+		if(flag = 2){
+
+		}
+
+	}else{
+
+	}
+}*/
