@@ -7,9 +7,16 @@ import (
 	"os/signal"
 )
 
-func InitDHT(ID []byte, bIP string, bPort string, privkey *rsa.PrivateKey, extractor ExtractorFunc) (*DHT, string) {
-	ip := "0"
-	port := "0"
+func InitDHT(ID []byte, bIP string, bPort string, ip string, port string, privkey *rsa.PrivateKey, extractor ExtractorFunc) (*DHT, string) {
+    var stun bool
+
+    if ip == "" || port == "" {
+        ip = "0"
+        port = "0"
+        stun = true
+    } else {
+        stun = false
+    }
 
 	var bootstrapNodes []*NetworkNode
 	if bIP != "" || bPort != "" {
@@ -21,7 +28,7 @@ func InitDHT(ID []byte, bIP string, bPort string, privkey *rsa.PrivateKey, extra
 		BootstrapNodes: bootstrapNodes,
 		IP:             ip,
 		Port:           port,
-		UseStun:        true,
+		UseStun:        stun,
 		ID:             ID,
 		PrivKey:        privkey,
 		mailExtractor:  extractor,

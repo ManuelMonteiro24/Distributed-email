@@ -647,8 +647,6 @@ func (dht *DHT) listen() {
 				dht.networking.sendMessage(response, false, msg.ID)
 			case messageTypeOnion:
 				onion := DecryptOnion(msg.Data.([]byte))
-				fmt.Println("got onion for ")
-				fmt.Println(onion.Next.Port)
 				if onion != nil {
 					deonion, err := RemoveOnionLayer(onion, dht.options.PrivKey)
 					if err != nil {
@@ -657,7 +655,6 @@ func (dht *DHT) listen() {
 					next_onion := DecryptOnion(deonion)
 					if next_onion != nil {
 						// onion data is another onion, send it forward
-						fmt.Println("got onion to forward")
 						if err != nil {
 							panic(err)
 						}
@@ -670,11 +667,8 @@ func (dht *DHT) listen() {
 					} else {
 						// onion data is a message to be stored
 						id := dht.options.mailExtractor(deonion)
-						fmt.Println("got message to store in", id)
 						lastID := dht.GetFirstAvailableID(id, 10)
-						fmt.Println("stored in ID", lastID)
 						id, err := dht.Store(deonion, lastID, true)
-						fmt.Println(id)
 						if err != nil {
 							panic(err)
 						}
@@ -692,10 +686,6 @@ func (dht *DHT) listen() {
 
 func (dht *DHT) SendEmail(email []byte) {
 	onion_nodes := getRandomNodesForOnion(dht.ht)
-
-	for _, oni_node := range onion_nodes {
-		fmt.Println(oni_node.Port)
-	}
 
 	if len(onion_nodes) == 0 {
 		fmt.Println("I don't know any nodes... Can't send email")
@@ -732,7 +722,6 @@ func (dht *DHT) GetFirstAvailableID(ID string, max_tries int) string {
 			return lastID
 		}
 		lastID = Hashit(lastID)
-		fmt.Println(lastID)
 	}
 	return lastID
 }
@@ -749,7 +738,6 @@ func (dht *DHT) Lookup(ID string, max_tries int) ([][]byte, string) {
 			results = append(results, value)
 		}
 		lastID = Hashit(lastID)
-		fmt.Println(lastID)
 	}
 	return results, lastID
 }
