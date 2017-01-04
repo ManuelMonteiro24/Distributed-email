@@ -23,6 +23,9 @@ random DHT fingers from the sending node.
 * cd $GOROOT/src/distributed-email
 * go run *.go
 
+## Contacts
+Upon registration a key pair associated to the user name is generated and stored in the Users directory. For sending and receiving the emails the program utilizes the public key contacts stored in the Contacts Directory, upon receiving a public key from another user this one must store it in the Contacts Directory in the format username_PublicKey (e.g. john_PublicKey).
+
 ---
 
 This project was done in the context of a Cryptography and Communications Security course at IST, in Lisbon, 

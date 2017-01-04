@@ -31,7 +31,6 @@ da estrutura Mail. Layout em strut.go
  */
 func buildHeader(to string) (header string) {
 	return header
-
 }
 
 /*Retorna uma string gerada aleatoriamente de n bytes*/
