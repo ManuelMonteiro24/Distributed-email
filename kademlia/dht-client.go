@@ -8,8 +8,8 @@ import (
 )
 
 func InitDHT(ID []byte, bIP string, bPort string, privkey *rsa.PrivateKey, extractor ExtractorFunc) (*DHT, string) {
-	ip := ""
-	port := ""
+	ip := "0"
+	port := "0"
 
 	var bootstrapNodes []*NetworkNode
 	if bIP != "" || bPort != "" {
@@ -61,10 +61,11 @@ func InitDHT(ID []byte, bIP string, bPort string, privkey *rsa.PrivateKey, extra
 	}()
 
 	public_key_id, err := dht.Store(SerializePublicKey(&privkey.PublicKey), Hashit(dht.GetSelfID()), true)
+	fmt.Println("Stored public key on ID", public_key_id)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Stored public key with Id: " + public_key_id)
+	fmt.Println("Network Id: " + dht.GetSelfID())
 
 	return dht, public_key_id
 }

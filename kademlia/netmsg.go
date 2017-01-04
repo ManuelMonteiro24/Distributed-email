@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-	"fmt"
 	"io"
 )
 
@@ -59,6 +58,7 @@ func netMsgInit() {
 	gob.Register(&responseDataFindNode{})
 	gob.Register(&responseDataFindValue{})
 	gob.Register(&responseDataStore{})
+	gob.Register(&Onion{})
 }
 
 func serializeMessage(q *message) ([]byte, error) {
@@ -109,6 +109,5 @@ func deserializeMessage(conn io.Reader) (*message, error) {
 		return nil, err
 	}
 
-	fmt.Println("deserializeMessage", lengthBytes[:], len(msgBytes))
 	return msg, nil
 }

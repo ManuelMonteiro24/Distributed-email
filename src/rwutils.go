@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
-	"os"
+//	"os"
 )
 
 /*Retorna o conteudo de um ficheiro de texto para uma string

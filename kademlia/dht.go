@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha1"
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"sort"
@@ -645,24 +646,41 @@ func (dht *DHT) listen() {
 				response.Type = messageTypePing
 				dht.networking.sendMessage(response, false, msg.ID)
 			case messageTypeOnion:
-				onion, err := DecryptOnion(msg.Data.([]byte))
-				if err != nil {
-					// onion data is another onion, send it forward
-					inner_onion, err := RemoveOnionLayer(onion, dht.options.PrivKey)
+				onion := DecryptOnion(msg.Data.([]byte))
+				fmt.Println("got onion for ")
+				fmt.Println(onion.Next.Port)
+				if onion != nil {
+					deonion, err := RemoveOnionLayer(onion, dht.options.PrivKey)
 					if err != nil {
 						panic(err)
 					}
-					response := &message{IsResponse: false}
-					response.Sender = dht.ht.Self
-					response.Receiver = &onion.Next
-					response.Type = messageTypeOnion
-					response.Data = inner_onion
-					dht.networking.sendMessage(response, false, msg.ID)
+					next_onion := DecryptOnion(deonion)
+					if next_onion != nil {
+						// onion data is another onion, send it forward
+						fmt.Println("got onion to forward")
+						if err != nil {
+							panic(err)
+						}
+						response := &message{IsResponse: false}
+						response.Sender = dht.ht.Self
+						response.Receiver = &next_onion.Next
+						response.Type = messageTypeOnion
+						response.Data = deonion
+						dht.networking.sendMessage(response, false, msg.ID)
+					} else {
+						// onion data is a message to be stored
+						id := dht.options.mailExtractor(deonion)
+						fmt.Println("got message to store in", id)
+						lastID := dht.GetFirstAvailableID(id, 10)
+						fmt.Println("stored in ID", lastID)
+						id, err := dht.Store(deonion, lastID, true)
+						fmt.Println(id)
+						if err != nil {
+							panic(err)
+						}
+					}
 				} else {
-					// onion data is a message to be stored
-					id := dht.options.mailExtractor(msg.Data.([]byte))
-					_, lastID := dht.Lookup(id, 10)
-					dht.Store(onion.Data, lastID, true)
+					fmt.Println("got corrupt onion")
 				}
 			}
 		case <-dht.networking.getDisconnect():
@@ -673,34 +691,57 @@ func (dht *DHT) listen() {
 }
 
 func (dht *DHT) SendEmail(email []byte) {
-
 	onion_nodes := getRandomNodesForOnion(dht.ht)
-	first_node := onion_nodes[0]
-	onion_nodes = onion_nodes[1:]
 
-	onion, err := BuildOnion(dht, onion_nodes, email)
-	if err != nil {
-		panic(err)
+	for _, oni_node := range onion_nodes {
+		fmt.Println(oni_node.Port)
 	}
 
-	msg := &message{IsResponse: false}
-	msg.Sender = dht.ht.Self
-	msg.Receiver = first_node
-	msg.Type = messageTypeOnion
-	msg.Data = onion
-	dht.networking.sendMessage(msg, false, 0)
+	if len(onion_nodes) == 0 {
+		fmt.Println("I don't know any nodes... Can't send email")
+	} else {
+		onion, err := BuildOnion(dht, onion_nodes, email)
+		if err != nil {
+			panic(err)
+		}
+		msg := &message{IsResponse: false}
+		msg.Sender = dht.ht.Self
+		msg.Receiver = onion_nodes[len(onion_nodes)-1]
+		msg.Type = messageTypeOnion
+		msg.Data = onion
+		_, err = dht.networking.sendMessage(msg, false, 0)
+		if err != nil {
+			panic(err)
+		}
+
+	}
 
 }
 
-func (dht *DHT) Lookup(ID string, max_tries int) ([][]byte, string) {
-	var value []byte
+func (dht *DHT) GetFirstAvailableID(ID string, max_tries int) string {
 	var exists bool
 	var err error
 
 	lastID := Hashit(Hashit(ID))
+	for i := 0; i < max_tries; i++ {
+		_, exists, err = dht.Get(lastID)
+		if err != nil {
+			panic(err)
+		}
+		if !exists {
+			return lastID
+		}
+		lastID = Hashit(lastID)
+		fmt.Println(lastID)
+	}
+	return lastID
+}
+
+func (dht *DHT) Lookup(ID string, max_tries int) ([][]byte, string) {
+	lastID := Hashit(Hashit(ID))
 	results := make([][]byte, 0)
 	for i := 0; i < max_tries; i++ {
-		value, exists, err = dht.Get(lastID)
+		value, exists, err := dht.Get(lastID)
 		if err != nil {
 			panic(err)
 		}
@@ -708,6 +749,7 @@ func (dht *DHT) Lookup(ID string, max_tries int) ([][]byte, string) {
 			results = append(results, value)
 		}
 		lastID = Hashit(lastID)
+		fmt.Println(lastID)
 	}
 	return results, lastID
 }

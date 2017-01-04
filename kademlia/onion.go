@@ -9,24 +9,15 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
+	"fmt"
 	b58 "github.com/jbenet/go-base58"
 	"io"
+	rnd "math/rand"
 )
 
 type Onion struct {
 	Next NetworkNode
 	Data []byte
-}
-
-func randInt() int {
-	randBytes := make([]byte, 8)
-	rand.Read(randBytes)
-	randReader := bytes.NewBuffer(randBytes)
-	rando, err := binary.ReadUvarint(randReader)
-	if err != nil {
-		panic(err)
-	}
-	return int(rando)
 }
 
 func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
@@ -41,7 +32,7 @@ func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
 	}
 
 	for len(onion_nodes) < n {
-		buc = randInt() % 160
+		buc = rnd.Intn(160)
 		l = len(ht.RoutingTable[buc])
 		e = extracted[buc]
 		if l > e {
@@ -54,6 +45,8 @@ func getRandomNodesForOnion(ht *hashTable) (onion_nodes []*NetworkNode) {
 }
 
 func (dht *DHT) GetPubKeyByID(ID string) *rsa.PublicKey {
+	fmt.Println("getting pubkey from node", ID)
+	fmt.Println("on key", Hashit(ID))
 	pubkeyBytes, found, err := dht.Get(Hashit(ID))
 
 	if !found {
@@ -71,6 +64,16 @@ func (dht *DHT) GetNodePubKey(node *NetworkNode) *rsa.PublicKey {
 	return dht.GetPubKeyByID(IDstr)
 }
 
+func SerializeOnion(onion *Onion) []byte {
+	buf := new(bytes.Buffer)
+	enc := gob.NewEncoder(buf)
+	err := enc.Encode(onion)
+	if err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
 func BuildOnion(dht *DHT, nodes []*NetworkNode, data []byte) ([]byte, error) {
 	// build onion from data, given nodes and their keys
 
@@ -78,26 +81,24 @@ func BuildOnion(dht *DHT, nodes []*NetworkNode, data []byte) ([]byte, error) {
 
 	cipher := Encrypt(pubkey, data)
 
+	fmt.Println("encrypting for port")
+	fmt.Println(nodes[0].Port)
+
 	onion := Onion{
 		*nodes[0],
 		cipher,
 	}
 
-	buf := new(bytes.Buffer)
-	enc := gob.NewEncoder(buf)
-	err := enc.Encode(onion)
-	if err != nil {
-		panic(err)
-	}
+	serOnion := SerializeOnion(&onion)
 
 	if len(nodes) > 1 {
-		return BuildOnion(dht, nodes[1:], buf.Bytes())
+		return BuildOnion(dht, nodes[1:], serOnion)
 	} else {
-		return buf.Bytes(), nil
+		return serOnion, nil
 	}
 }
 
-func RemoveOnionLayer(onion Onion, privkey *rsa.PrivateKey) ([]byte, error) {
+func RemoveOnionLayer(onion *Onion, privkey *rsa.PrivateKey) ([]byte, error) {
 	// the function name is self-explaining
 	result := Decrypt(privkey, onion.Data)
 	if len(result) > 0 {
@@ -107,16 +108,16 @@ func RemoveOnionLayer(onion Onion, privkey *rsa.PrivateKey) ([]byte, error) {
 	}
 }
 
-func DecryptOnion(data []byte) (Onion, error) {
+func DecryptOnion(data []byte) *Onion {
 	oni := &Onion{}
 
 	reader := bytes.NewBuffer(data)
 	dec := gob.NewDecoder(reader)
 	err := dec.Decode(oni)
 	if err != nil {
-		panic(err)
+		return nil
 	}
-	return *oni, nil
+	return oni
 }
 
 func Encrypt(pubkey *rsa.PublicKey, data []byte) []byte {

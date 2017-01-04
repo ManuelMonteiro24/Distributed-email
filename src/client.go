@@ -31,8 +31,8 @@ func main() {
 	user_name, userKey := AuthUser()
 	ID := userID(&userKey.PublicKey)
 
-	bIP := DataInput("bootstrapIP")
-	bPort := DataInput("bootstrapPort")
+	bIP := DataInput("bootstrapIP\n")
+	bPort := DataInput("bootstrapPort\n")
 
 	dht, _ := kademlia.InitDHT(ID[:], bIP, bPort, userKey, ExtractToIDfromMail)
 
@@ -44,6 +44,7 @@ func main() {
 
 func ExtractToIDfromMail(data []byte) string {
 	mail := ReadJSON(data)
+
 	var header Header
 	header.StringToHeader(mail.Header)
 
@@ -123,7 +124,7 @@ func ReadMail(userKey *rsa.PrivateKey, mail Mail, dht *kademlia.DHT) {
 	payload := SymDecrypt(symKey, mail.Payload)
 	from := SymDecrypt(symKey, mail.From)
 
-	senderKey := dht.GetPubKeyByID(from)
+	senderKey := dht.GetPubKeyByID(strings.Replace(from, "\n", "", -1))
 
 	plParts := strings.Split(payload, "//\\\\")
 
@@ -198,7 +199,7 @@ func AuthUser() (string, *rsa.PrivateKey) {
 	err := os.MkdirAll(subpath, os.ModePerm)
 	checkError(err)
 
-	user_name := DataInput("Insert Username: ")
+	user_name := DataInput("Insert Username: \n")
 	userPriv := filepath.Join(subpath, user_name+"_PrivateKey")
 	_, err = os.Stat(userPriv)
 
@@ -295,7 +296,6 @@ func Menu(user_name string, userKey *rsa.PrivateKey, dht *kademlia.DHT) {
 			fmt.Println("Contact not stored.")
 			destID := DataInput("Insert dest ID:")
 			if destID != "" {
-				file_name := FileToSend()
 				dest_PublicKey = dht.GetPubKeyByID(destID)
 				if dest_PublicKey != nil {
 					Sendit(user_name, dest_name, userKey, dest_PublicKey, dht)
@@ -335,6 +335,7 @@ func RcvDest() (string, *rsa.PublicKey, bool) {
 
 	//Check if contact exists
 	subpath = filepath.Join(subpath, recp_name+"_PublicKey")
+	fmt.Println(subpath)
 	_, err := os.Stat(subpath)
 
 	if os.IsNotExist(err) {
@@ -373,6 +374,9 @@ func DataInput(msg string) string {
 		fmt.Println(msg)
 		n, err := fmt.Scanln(&data)
 		if n < 1 || n > 2 || err != nil {
+			if n == 0 {
+				return ""
+			}
 			fmt.Println("Invalid input")
 		} else {
 			return data
